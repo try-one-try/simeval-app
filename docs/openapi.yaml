@@ -1,11 +1,12 @@
+# 业务 HTTP 契约草案：描述计划中的接口，不代表当前阶段已实现。
 openapi: 3.1.0
 info:
   title: SimEval HTTP API
-  version: 0.1.0-draft
+  version: 0.2.0-draft
   description: |
     编码前契约草案；所有业务数据与评测执行均为明确标注的合成/模拟数据。
     本文件描述计划接口，不表示接口已经实现。角色要求见各操作的 x-roles。
-    重新打开异常样本的状态流转仍待决策，故暂未虚构该操作。
+    异常样本重开采用独立操作；所有写入仍须由服务端校验身份、角色、参数和状态。
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 tags:
   - { name: DataQuality, description: 数据集质量 }
@@ -201,7 +202,7 @@ paths:
       operationId: reviewAnomalySample
       summary: 保存复核或解决样本；必要时同事务创建回补任务
       x-roles: [ENGINEER, REVIEWER, ADMIN]
-      description: resolve=true 仅 REVIEWER/ADMIN；解决需负责人、分类、人工结论。重开操作待决策。
+      description: resolve=true 仅 REVIEWER/ADMIN；解决需负责人、分类、人工结论。REOPENED 样本保存新草稿时进入 IN_REVIEW。
       parameters:
         - $ref: '#/components/parameters/SampleId'
       requestBody:
@@ -209,6 +210,25 @@ paths:
         content: { application/json: { schema: { $ref: '#/components/schemas/ReviewRequest' } } }
       responses:
         '200': { description: 更新后的样本及可选回补任务, content: { application/json: { schema: { $ref: '#/components/schemas/ReviewEnvelope' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+  /api/anomaly-samples/{sampleId}/reopen:
+    post:
+      tags: [Anomaly]
+      operationId: reopenAnomalySample
+      summary: 重新打开已解决的异常样本
+      x-roles: [REVIEWER, ADMIN]
+      description: 仅允许 RESOLVED → REOPENED；保留负责人和历史结论，清空当前分类、结论及解决时间。原因、状态变化和审计同事务记录。
+      parameters:
+        - $ref: '#/components/parameters/SampleId'
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ReopenSampleRequest' } } }
+      responses:
+        '200': { description: 重开后的样本及复核历史, content: { application/json: { schema: { $ref: '#/components/schemas/SampleEnvelope' } } } }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
@@ -477,6 +497,7 @@ components:
         reviewCategory: { anyOf: [ { $ref: '#/components/schemas/ReviewCategory' }, { type: 'null' } ] }
         assigneeId: { type: [string, 'null'] }
         conclusion: { type: [string, 'null'] }
+        resolvedAt: { type: [string, 'null'], format: date-time }
         mediaPath: { type: [string, 'null'] }
         logExcerpt: { type: [string, 'null'] }
         version: { type: integer, minimum: 0 }
@@ -497,6 +518,7 @@ components:
                   toStatus: { $ref: '#/components/schemas/SampleStatus' }
                   category: { anyOf: [ { $ref: '#/components/schemas/ReviewCategory' }, { type: 'null' } ] }
                   conclusion: { type: [string, 'null'] }
+                  reopenReason: { type: [string, 'null'] }
                   createdAt: { type: string, format: date-time }
     SampleEnvelope: { type: object, required: [data, meta], properties: { data: { $ref: '#/components/schemas/SampleDetail' }, meta: { $ref: '#/components/schemas/RequestMeta' } } }
     SampleListEnvelope: { type: object, required: [data, meta], properties: { data: { type: array, items: { $ref: '#/components/schemas/Sample' } }, meta: { $ref: '#/components/schemas/PageMeta' } } }
@@ -517,6 +539,13 @@ components:
         labels: { type: array, items: { type: string }, default: [] }
         resolve: { type: boolean }
         createBackfillTask: { type: boolean }
+        expectedVersion: { type: integer, minimum: 0 }
+    ReopenSampleRequest:
+      type: object
+      additionalProperties: false
+      required: [reason, expectedVersion]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 500, description: 服务端去除首尾空白后仍须非空 }
         expectedVersion: { type: integer, minimum: 0 }
     ReviewEnvelope:
       type: object

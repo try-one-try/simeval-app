@@ -1,0 +1,23 @@
+# 依赖、构建与生成产物由安装和构建命令再生，不进入仓库。
+node_modules/
+.npm-cache/
+src/generated/prisma/
+.next/
+out/
+coverage/
+.turbo/
+*.tsbuildinfo
+
+# 本地部署配置与真实凭据只保留在运行环境；公开模板 .env.example 例外。
+.vercel/
+.env
+.env.*
+!.env.example
+!.env.test.example
+
+# 日志与个人编辑器状态不属于项目交付。
+*.log
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

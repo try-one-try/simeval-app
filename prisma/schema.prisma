@@ -1,0 +1,298 @@
+// 数据结构契约：定义账号、版本、评测、复核、报告与审计；真正的连接密码不写在这里。
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  // 这里声明数据库类型；连接地址由 prisma7.config.ts 从 DATABASE_URL 提供。
+  provider = "mysql"
+}
+
+enum Role {
+  ENGINEER
+  REVIEWER
+  ADMIN
+}
+
+enum QualityStatus {
+  PASSED
+  WARNING
+  FAILED
+}
+
+enum RunStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+enum MetricDirection {
+  HIGHER_IS_BETTER
+  LOWER_IS_BETTER
+}
+
+enum ReviewCategory {
+  MODEL_ISSUE
+  DATA_ISSUE
+  INVALID_SAMPLE
+  FALSE_POSITIVE
+  UNKNOWN
+}
+
+enum SampleStatus {
+  OPEN
+  IN_REVIEW
+  RESOLVED
+  REOPENED
+}
+
+enum BackfillStatus {
+  OPEN
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum ReportStatus {
+  READY
+  CONFIRMED
+  FAILED
+}
+
+model User {
+  id             String          @id @default(cuid()) @db.VarChar(64)
+  email          String          @unique @db.VarChar(191)
+  name           String          @db.VarChar(120)
+  role           Role
+  passwordHash   String          @db.VarChar(255)
+  isDemo         Boolean         @default(false)
+  createdAt      DateTime        @default(now())
+  createdRuns    EvaluationRun[] @relation("RunCreator")
+  assignedSamples AnomalySample[] @relation("SampleAssignee")
+  reviews        ReviewRecord[]  @relation("Reviewer")
+  createdBackfills BackfillTask[] @relation("BackfillCreator")
+  assignedBackfills BackfillTask[] @relation("BackfillAssignee")
+  requestedReports AIReport[] @relation("ReportRequester")
+  confirmedReports AIReport[] @relation("ReportConfirmer")
+  audits         AuditLog[]      @relation("AuditActor")
+}
+
+model Project {
+  id          String           @id @default(cuid()) @db.VarChar(64)
+  slug        String           @unique @db.VarChar(120)
+  name        String           @db.VarChar(191)
+  description String           @db.Text
+  createdAt   DateTime         @default(now())
+  models      ModelVersion[]
+  datasets    DatasetVersion[]
+  benchmarks  Benchmark[]
+  runs        EvaluationRun[]
+}
+
+model ModelVersion {
+  id          String          @id @default(cuid()) @db.VarChar(64)
+  projectId   String          @db.VarChar(64)
+  name        String          @db.VarChar(120)
+  version     String          @db.VarChar(64)
+  artifactRef String?         @db.VarChar(255)
+  metadata    Json?
+  project     Project         @relation(fields: [projectId], references: [id])
+  runs        EvaluationRun[]
+  @@unique([projectId, name, version])
+}
+
+model DatasetVersion {
+  id            String             @id @default(cuid()) @db.VarChar(64)
+  projectId     String             @db.VarChar(64)
+  name          String             @db.VarChar(120)
+  version       String             @db.VarChar(64)
+  sampleCount   Int
+  qualityStatus QualityStatus
+  metadata      Json?
+  project       Project            @relation(fields: [projectId], references: [id])
+  checks        DataQualityCheck[]
+  runs          EvaluationRun[]
+  @@unique([projectId, name, version])
+}
+
+model DataQualityCheck {
+  id               String         @id @default(cuid()) @db.VarChar(64)
+  datasetVersionId String         @db.VarChar(64)
+  checkKey         String         @db.VarChar(120)
+  name             String         @db.VarChar(191)
+  status           QualityStatus
+  affectedCount    Int
+  message          String         @db.Text
+  details          Json?
+  datasetVersion   DatasetVersion @relation(fields: [datasetVersionId], references: [id])
+  @@unique([datasetVersionId, checkKey])
+  @@index([datasetVersionId, status])
+}
+
+model Benchmark {
+  id          String             @id @default(cuid()) @db.VarChar(64)
+  projectId   String             @db.VarChar(64)
+  name        String             @db.VarChar(120)
+  version     String             @db.VarChar(64)
+  project     Project            @relation(fields: [projectId], references: [id])
+  metrics     MetricDefinition[]
+  runs        EvaluationRun[]
+  @@unique([projectId, name, version])
+}
+
+model MetricDefinition {
+  id          String          @id @default(cuid()) @db.VarChar(64)
+  benchmarkId String          @db.VarChar(64)
+  key         String          @db.VarChar(120)
+  name        String          @db.VarChar(120)
+  unit        String          @db.VarChar(32)
+  direction   MetricDirection
+  benchmark   Benchmark       @relation(fields: [benchmarkId], references: [id])
+  results     MetricResult[]
+  @@unique([benchmarkId, key])
+}
+
+model EvaluationRun {
+  id                 String          @id @default(cuid()) @db.VarChar(64)
+  projectId          String          @db.VarChar(64)
+  modelVersionId     String          @db.VarChar(64)
+  datasetVersionId   String          @db.VarChar(64)
+  benchmarkId        String          @db.VarChar(64)
+  baselineRunId      String?         @db.VarChar(64)
+  retryOfRunId       String?         @db.VarChar(64)
+  status             RunStatus
+  createdById        String          @db.VarChar(64)
+  provider           String          @db.VarChar(80)
+  externalJobId      String?         @db.VarChar(191)
+  episodeCount       Int
+  simulationSeed     Int
+  isDemoFixture      Boolean         @default(false)
+  startedAt          DateTime?
+  finishedAt         DateTime?
+  resultsGeneratedAt DateTime?
+  errorCode          String?         @db.VarChar(120)
+  errorMessage       String?         @db.Text
+  idempotencyKey     String?         @db.VarChar(128)
+  createdAt          DateTime        @default(now())
+  project            Project         @relation(fields: [projectId], references: [id])
+  modelVersion       ModelVersion    @relation(fields: [modelVersionId], references: [id])
+  datasetVersion     DatasetVersion  @relation(fields: [datasetVersionId], references: [id])
+  benchmark          Benchmark       @relation(fields: [benchmarkId], references: [id])
+  createdBy          User            @relation("RunCreator", fields: [createdById], references: [id])
+  baselineRun        EvaluationRun?  @relation("BaselineRun", fields: [baselineRunId], references: [id])
+  comparisons        EvaluationRun[] @relation("BaselineRun")
+  retryOfRun         EvaluationRun?  @relation("RetryRun", fields: [retryOfRunId], references: [id])
+  retries            EvaluationRun[] @relation("RetryRun")
+  metricResults      MetricResult[]
+  anomalies          AnomalySample[]
+  reports            AIReport[]      @relation("ReportRun")
+  baselineReports    AIReport[]      @relation("ReportBaseline")
+  @@unique([createdById, idempotencyKey])
+  @@index([projectId, status, createdAt])
+}
+
+model MetricResult {
+  id                 String           @id @default(cuid()) @db.VarChar(64)
+  runId              String           @db.VarChar(64)
+  metricDefinitionId String           @db.VarChar(64)
+  scenarioKey        String           @db.VarChar(120)
+  value              Decimal          @db.Decimal(12, 4)
+  sampleCount        Int
+  run                EvaluationRun    @relation(fields: [runId], references: [id])
+  metricDefinition   MetricDefinition @relation(fields: [metricDefinitionId], references: [id])
+  @@unique([runId, metricDefinitionId, scenarioKey])
+}
+
+model AnomalySample {
+  id             String         @id @default(cuid()) @db.VarChar(64)
+  runId          String         @db.VarChar(64)
+  sampleNumber   String         @db.VarChar(80)
+  scenarioKey    String         @db.VarChar(120)
+  anomalyType    String         @db.VarChar(120)
+  metricKey      String         @db.VarChar(120)
+  reviewCategory ReviewCategory?
+  status         SampleStatus
+  assigneeId     String?        @db.VarChar(64)
+  mediaPath      String?        @db.VarChar(255)
+  logExcerpt     String?        @db.Text
+  metadata       Json?
+  conclusion     String?        @db.Text
+  version        Int            @default(1)
+  resolvedAt     DateTime?
+  run            EvaluationRun  @relation(fields: [runId], references: [id])
+  assignee       User?          @relation("SampleAssignee", fields: [assigneeId], references: [id])
+  reviews        ReviewRecord[]
+  backfills      BackfillTask[]
+  @@unique([runId, sampleNumber])
+  @@index([runId, metricKey, scenarioKey, status])
+  @@index([assigneeId, status])
+}
+
+model ReviewRecord {
+  id              String          @id @default(cuid()) @db.VarChar(64)
+  anomalySampleId String          @db.VarChar(64)
+  reviewerId      String          @db.VarChar(64)
+  fromStatus      SampleStatus
+  toStatus        SampleStatus
+  category        ReviewCategory?
+  conclusion      String?         @db.Text
+  reopenReason    String?         @db.Text
+  createdAt       DateTime        @default(now())
+  anomalySample   AnomalySample   @relation(fields: [anomalySampleId], references: [id])
+  reviewer        User            @relation("Reviewer", fields: [reviewerId], references: [id])
+  @@index([anomalySampleId, createdAt])
+}
+
+model BackfillTask {
+  id              String         @id @default(cuid()) @db.VarChar(64)
+  anomalySampleId String         @db.VarChar(64)
+  reason          String         @db.Text
+  status          BackfillStatus
+  assigneeId      String?        @db.VarChar(64)
+  resolutionNote  String?        @db.Text
+  createdById     String         @db.VarChar(64)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  anomalySample   AnomalySample  @relation(fields: [anomalySampleId], references: [id])
+  assignee        User?          @relation("BackfillAssignee", fields: [assigneeId], references: [id])
+  createdBy       User           @relation("BackfillCreator", fields: [createdById], references: [id])
+  @@index([status, assigneeId])
+}
+
+model AIReport {
+  id              String         @id @default(cuid()) @db.VarChar(64)
+  runId           String         @db.VarChar(64)
+  baselineRunId   String?        @db.VarChar(64)
+  status          ReportStatus
+  inputSnapshot   Json
+  output          Json
+  provider        String         @db.VarChar(80)
+  model           String?        @db.VarChar(80)
+  requestedById   String         @db.VarChar(64)
+  confirmedById   String?        @db.VarChar(64)
+  confirmedAt     DateTime?
+  idempotencyKey  String?        @db.VarChar(128)
+  errorMessage    String?        @db.Text
+  createdAt       DateTime       @default(now())
+  run             EvaluationRun  @relation("ReportRun", fields: [runId], references: [id])
+  baselineRun     EvaluationRun? @relation("ReportBaseline", fields: [baselineRunId], references: [id])
+  requestedBy     User           @relation("ReportRequester", fields: [requestedById], references: [id])
+  confirmedBy     User?          @relation("ReportConfirmer", fields: [confirmedById], references: [id])
+  @@unique([requestedById, idempotencyKey])
+}
+
+model AuditLog {
+  id         String   @id @default(cuid()) @db.VarChar(64)
+  actorId    String   @db.VarChar(64)
+  action     String   @db.VarChar(120)
+  entityType String   @db.VarChar(120)
+  entityId   String   @db.VarChar(64)
+  requestId  String   @db.VarChar(128)
+  metadata   Json?
+  createdAt  DateTime @default(now())
+  actor      User     @relation("AuditActor", fields: [actorId], references: [id])
+  @@index([entityType, entityId, createdAt])
+}

@@ -1,0 +1,59 @@
+{
+  "name": "simeval-app",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "SimEval 是面向具身智能团队的评测数据工作台。它围绕数据质量、模拟评测、模型版本对比、异常样本复核、轻量数据回补和证据报告，帮助团队解释候选模型能否替换基线。",
+  "scripts": {
+    "postinstall": "prisma generate",
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "node scripts/run-integration-tests.mjs",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/try-one-try/simeval-app.git"
+  },
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@prisma/adapter-mariadb": "7.10.0",
+    "@prisma/client": "7.10.0",
+    "bcryptjs": "3.0.3",
+    "lucide-react": "1.47.0",
+    "next": "16.3.6",
+    "next-auth": "5.0.0-beta.32",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "server-only": "0.0.1",
+    "zod": "4.6.5"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "4.3.3",
+    "@types/node": "26.6.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.3.6",
+    "mysql2": "3.24.4",
+    "postcss": "8.5.28",
+    "prisma": "7.10.0",
+    "tailwindcss": "4.3.3",
+    "tsx": "4.23.15",
+    "typescript": "6.0.3",
+    "vitest": "5.0.1"
+  },
+  "overrides": {
+    "deepmerge-ts": "8.0.2",
+    "mariadb": "3.5.4",
+    "mysql2": "3.24.4"
+  }
+}
