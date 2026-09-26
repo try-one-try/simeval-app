@@ -1,6 +1,8 @@
 "use client";
+import Link from "next/link";
 
-// 查询失败时保留明确的错误状态，并允许访问者主动重试。
-export default function OverviewError({ reset }: { error: Error; reset: () => void }) {
-  return <main className="content"><div className="eyebrow">Overview / 项目总览</div><h1>暂时无法读取项目数据</h1><p className="content-intro">连接或查询失败。请稍后重试；我们不会把读取错误显示成零条记录。</p><button className="primary-button" type="button" onClick={reset}>重试读取</button></main>;
+
+// 读取失败不显示零值；使用当前 Next.js 错误边界的 retry 重新获取数据。
+export default function OverviewError({ retry }: { error: Error; retry: () => void }) {
+  return <main className="content state-content"><p className="breadcrumb">总览 / 当前演示项目</p><h1>暂时无法读取项目数据</h1><p role="alert" className="muted">连接或查询失败，请稍后重试。当前没有可靠结果可展示。</p><button className="primary-button" type="button" onClick={retry}>重试读取</button><Link href="/" className="text-action">返回首页 ↗</Link></main>;
 }

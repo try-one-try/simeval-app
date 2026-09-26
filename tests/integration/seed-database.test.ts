@@ -7,6 +7,8 @@ import { PrismaClient } from "../../src/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import { parseDatabaseUrl } from "../../src/lib/database-url";
 
+vi.mock("server-only", () => ({}));
+
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 if (existsSync(".env.test.local")) process.loadEnvFile(".env.test.local");
 
@@ -50,6 +52,20 @@ describe.skipIf(!testUrl)("独立 MySQL 测试库", () => {
       expect(second.runs).toHaveLength(2);
       expect(second.samples).toHaveLength(2);
       expect(second.report).toEqual({ id: "demo-report-confirmed", runId: "demo-run-candidate", baselineRunId: "demo-run-baseline" });
+      // 验证页面实际使用的关系查询，而不只检查表中存在固定 ID。
+      const { overviewRepository } = await import("../../src/server/repositories/overview-repository");
+      const { getDb } = await import("../../src/server/db");
+      try {
+        const project = await overviewRepository.getDemoProject();
+        const candidate = project?.runs.find((run) => run.baselineRunId);
+        expect(candidate?.episodeCount).toBe(200);
+        expect(candidate?.metricResults).toHaveLength(4);
+        expect(candidate?.anomalies.filter((sample) => sample.status === "RESOLVED")).toHaveLength(2);
+        expect(candidate?.anomalies.flatMap((sample) => sample.backfills)).toHaveLength(1);
+        expect(candidate?.reports[0].confirmedBy?.name).toBe("陈复核");
+      } finally {
+        await getDb().$disconnect();
+      }
       const engineer = await db.user.findUnique({ where: { id: "demo-user-engineer" }, select: { passwordHash: true } });
       const demoPassword = process.env.DEMO_PASSWORD;
       if (!engineer || !demoPassword) throw new Error("Seed engineer or demo password missing");

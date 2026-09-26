@@ -21,7 +21,7 @@ describe("概览展示状态", () => {
   it("查询失败时交给错误边界，不显示空状态", async () => {
     stubs.getOverview.mockRejectedValue(new Error("database unavailable"));
     await expect(OverviewPage()).rejects.toThrow("database unavailable");
-    const html = renderToStaticMarkup(<OverviewError error={new Error("database unavailable")} reset={() => undefined} />);
+    const html = renderToStaticMarkup(<OverviewError error={new Error("database unavailable")} retry={() => undefined} />);
     expect(html).toContain("暂时无法读取项目数据");
     expect(html).toContain("重试读取");
     expect(html).not.toContain("演示数据尚未准备");

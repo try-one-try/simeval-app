@@ -1,68 +1,39 @@
-// 公开入口：说明产品价值与合成演示边界，并通过服务端动作进入工作台。
-import { ArrowRight, Check, Fingerprint, Layers3 } from "lucide-react";
+import Link from "next/link";
+// 公开入口展示产品价值；故事预览是合成示意，登录建立真实服务端会话。
 import { enterDemo } from "@/server/auth/actions";
-
-type Props = { searchParams: Promise<{ error?: string }> };
-
-export default async function HomePage({ searchParams }: Props) {
+import { DemoSubmit } from "@/components/demo-submit";
+import { MobileNavigation } from "@/components/workspace-navigation";
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
-
-  return (
-    <div className="page-shell">
-      <header className="site-header">
-        <div className="brand"><span className="brand-mark" aria-hidden="true">S</span> SimEval</div>
-        <span className="header-note">Embodied AI Evaluation Workspace</span>
-      </header>
-
-      <main>
-        <section className="hero" aria-labelledby="hero-title">
-          <div>
-            <div className="eyebrow">从评测结果，到可信判断</div>
-            <h1 id="hero-title">让每次模型迭代<br /><em>有据可循。</em></h1>
-            <p className="hero-copy">
-              SimEval 把数据质量、模拟评测、版本对比和异常复核串成一条证据链，
-              帮助具身智能团队解释：候选版本究竟能否替换基线。
-            </p>
-            <div className="hero-actions">
-              <form action={enterDemo}>
-                <button className="primary-button" type="submit">进入演示工作台 <ArrowRight size={17} aria-hidden="true" /></button>
-              </form>
-              <a className="subtle-link" href="#workflow">了解工作流 ↓</a>
-            </div>
-            {error === "setup" && <p role="alert" className="synthetic-note">演示环境尚未配置会话密钥或演示口令，请按 README 完成设置。</p>}
-            <p className="synthetic-note"><span className="note-dot" aria-hidden="true" />本项目使用合成数据与模拟评测，不运行真实仿真器。</p>
-          </div>
-
-          <div className="hero-visual" aria-label="工作台界面示意，不代表当前数据库中的真实记录">
-            <div className="visual-glow" aria-hidden="true" />
-            <div className="preview-card">
-              <div className="preview-top"><span>工作台 / 界面示意</span><span className="preview-pill">合成演示</span></div>
-              <div className="preview-heading"><strong>一次评测，完整的证据路径</strong><span>进入后查看实际保存的演示记录</span></div>
-              <div className="preview-grid">
-                <div className="preview-stat"><small>数据质量</small><b>检查</b></div>
-                <div className="preview-stat"><small>模型迭代</small><b>对比</b></div>
-              </div>
-              <div className="preview-line">
-                <div><strong>评测结果如何变成判断？</strong><span>证据链</span></div>
-                <div className="mini-bars" aria-hidden="true">
-                  <i style={{ height: "33%" }} /><i style={{ height: "68%" }} /><i style={{ height: "49%" }} />
-                  <i style={{ height: "81%" }} /><i style={{ height: "59%" }} /><i style={{ height: "74%" }} />
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className="feature-strip" id="workflow" aria-label="产品工作流">
-          <div className="feature-inner">
-            <div className="feature-item"><strong><Check size={15} style={{ display: "inline", marginRight: 8 }} aria-hidden="true" />先确认数据可信</strong><p>质量问题进入评测前就被看见，警告有明确来源。</p></div>
-            <div className="feature-item"><strong><Layers3 size={15} style={{ display: "inline", marginRight: 8 }} aria-hidden="true" />再看版本差异</strong><p>统一的基准和场景口径，让指标回退有迹可循。</p></div>
-            <div className="feature-item"><strong><Fingerprint size={15} style={{ display: "inline", marginRight: 8 }} aria-hidden="true" />最后由人确认</strong><p>异常分类、回补与报告保留可追溯的人工判断。</p></div>
-          </div>
-        </section>
-      </main>
-
-      <footer className="site-footer">SimEval · 面试演示项目 · 当前版本逐阶段开放功能</footer>
-    </div>
-  );
+  return <div className="landing">
+    <header className="site-header">
+      <Link href="/" className="brand">simeval.</Link>
+      <nav className="landing-nav" aria-label="首页导航"><Link href="#workflow">产品概览</Link><form action={enterDemo}><DemoSubmit compact /></form><span className="eyebrow">SYNTHETIC DEMO</span></nav>
+      <MobileNavigation />
+    </header>
+    <main>
+      <section className="hero" aria-labelledby="hero-title">
+        <div className="hero-message">
+          <p className="eyebrow">EMBODIED AI / EVALUATION WORKSPACE</p>
+          <h1 id="hero-title">看清模型表现，<br className="desktop-break" />也看清问题出在哪。</h1>
+          <h2 className="mobile-only">具身智能团队的评测数据工作台</h2>
+          <p className="hero-copy">SimEval 帮助团队检查数据质量、比较模型版本、复核异常样本，并形成有证据的评测报告。</p>
+          <div className="mobile-story mobile-only"><p className="muted">固定故事</p><p>总体成功率提升，但遮挡场景碰撞增加</p><p className="muted">演示路径</p><p>质量 → 评测 → 对比 → 证据 → 报告</p></div>
+          <div className="hero-actions"><form action={enterDemo}><DemoSubmit /></form><Link href="#workflow" className="secondary-button">了解流程 ↓</Link></div>
+          {error && <p role="alert" className="entry-error">{error === "setup" ? "演示环境尚未准备，请按 README 完成配置。" : "暂时无法进入演示，请稍后重试。"}</p>}
+          <p className="fine-print">合成数据 · 模拟评测 · 当前开放项目总览</p>
+        </div>
+        <aside className="story-preview" aria-label="固定合成故事示意，后续业务功能尚未开放">
+          <div className="preview-header"><span>一次评测</span><span>01 / 03 · 合成示意</span></div>
+          <h2>表现提升，风险待核对。</h2><p className="muted">PickPlace v2.3 → v2.4</p>
+          <div className="preview-metrics"><div><strong>81%</strong><span>总体成功率</span><span>+5 pp · 改善</span></div><div className="risk"><strong>13%</strong><span>遮挡场景碰撞率</span><span>+5 pp · 待复核</span></div></div>
+          <p className="preview-next">故事中的下一步 / 查看 2 个异常样本 →</p>
+        </aside>
+      </section>
+      <section className="workflow" id="workflow" aria-labelledby="workflow-title"><div className="workflow-inner">
+        <div className="workflow-heading"><h2 id="workflow-title">一次判断，如何形成</h2><span className="muted">从结果进入证据 · 目标流程</span></div>
+        <ol>{[["比较版本", "看见改善与代价"], ["复核样本", "分清数据问题与模型问题"], ["形成报告", "保留结论与证据"]].map(([title, copy], i) => <li key={title}><span className="step-number">0{i + 1}</span><div><h3>{title}</h3><p>{copy}</p></div></li>)}</ol>
+      </div></section>
+    </main>
+  </div>;
 }

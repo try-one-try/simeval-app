@@ -4,7 +4,7 @@ SimEval 是面向具身智能团队的评测数据工作台。它围绕数据质
 
 ## 当前状态
 
-**阶段 3 的本地工程基础与阶段 2 的当前 Figma 原型已由项目负责人验收；工程尚未按新原型更新。** 已实现 Next.js 入口、受保护概览、Auth.js 会话、Prisma 迁移和确定性 Seed。本机已验证登录、持久化概览、刷新与退出；lint、类型检查、13 项单元／组件测试、1 项独立 MySQL 集成测试和生产构建通过。网页由项目负责人手工验收；空／错误状态的真实浏览器走查及全新电脑上的初始化脚本运行尚无单独记录，见[阶段任务清单](specs/001-demo-foundation/tasks.md)。项目只使用明确标注的合成数据和模拟评测，不运行真实仿真器或训练模型。OpenAPI 的 19 个业务操作仍是未来切片的契约草案。
+**阶段 3 的入口与总览已按确认的 Figma 重做，待负责人验收新界面；数据库与会话保留已有验收。** 已实现 Next.js 入口、受保护概览、Auth.js 会话、Prisma 迁移和确定性 Seed。本机已验证登录、持久化概览、刷新与退出；lint、类型检查、21 项单元／组件测试、1 项独立 MySQL 集成测试和生产构建通过。网页由项目负责人手工验收；空／错误状态的真实浏览器走查及全新电脑上的初始化脚本运行尚无单独记录，见[阶段任务清单](specs/001-demo-foundation/tasks.md)。项目只使用明确标注的合成数据和模拟评测，不运行真实仿真器或训练模型。OpenAPI 的 19 个业务操作仍是未来切片的契约草案。
 
 ## 黄金路径
 
@@ -19,7 +19,7 @@ SimEval 是面向具身智能团队的评测数据工作台。它围绕数据质
 | 架构与数据边界  | [架构设计](docs/architecture.md)                                    | 本地迁移、Seed 与独立测试库集成测试已通过            |
 | HTTP 接口  | [OpenAPI 契约](docs/openapi.yaml)、[请求与响应示例](docs/api-contract.md) | 19 个业务接口仍是设计稿；Auth.js 自有会话路由已接入源码  |
 | 项目原则     | [Spec Kit constitution](.specify/memory/constitution.md)        | 已确定的开发约束                           |
-| 功能规格     | [演示工作台基础](specs/001-demo-foundation/spec.md)                    | 阶段 3 本地交付已签收；任务清单保留未单独核验项          |
+| 功能规格     | [演示工作台基础](specs/001-demo-foundation/spec.md)                    | 新界面技术检查通过；人审与未单独核验项见任务清单          |
 | 代理协作     | [AGENTS.md](AGENTS.md)                                          | 公开仓库的工作规则                          |
 
 
@@ -64,7 +64,7 @@ npm run dev
 
 **平时再次打开**：在 `simeval-app/` 中运行 `npm run dev`，看到 `Ready` 后访问 `http://localhost:3000`；结束时在该终端按 `Ctrl+C`。若端口 3000 已有本项目服务，直接打开网页即可，不要再启动第二个服务。改动依赖锁文件后才需要重新运行 `npm ci`；拉取仓库新增迁移时运行 `db:deploy`，自己修改 Schema 时运行 `db:migrate`，需要重建演示故事时运行 `db:seed`。
 
-当前只开放入口和概览，导航中的后续模块不可点击。本机已完成迁移、两次 Seed、实际登录、持久化概览、刷新、退出和 375px 无横向溢出走查；`npm run lint`、`npm run typecheck`、13 项单元／组件测试、1 项独立 MySQL 集成测试和 `npm run build` 通过。需要本地预览生产构建时，先用 `Ctrl+C` 停止开发服务器，再运行 `npm run build` 和 `npm run start`；仅对自己信任的 localhost 在被忽略的 `.env.local` 中设置 `AUTH_TRUST_HOST="true"`。普通 `npm run dev` 不需要此项。其余命令与待验项目见[完整验收步骤](specs/001-demo-foundation/quickstart.md)。评测执行与 AI 分析的 Provider 属于后续切片。
+当前按 Figma 实现黑白入口、六板块文字导航和持久化总览；只开放总览，其余模块显示未开放。桌面导航支持悬浮／点击展开说明，窄屏菜单支持 Escape 与焦点恢复。本机已完成迁移、两次 Seed、实际登录、持久化概览、刷新、退出和 375px 无横向溢出走查；`npm run lint`、`npm run typecheck`、21 项单元／组件测试、1 项独立 MySQL 集成测试和 `npm run build` 通过。需要本地预览生产构建时，先用 `Ctrl+C` 停止开发服务器，再运行 `npm run build` 和 `npm run start`；仅对自己信任的 localhost 在被忽略的 `.env.local` 中设置 `AUTH_TRUST_HOST="true"`。普通 `npm run dev` 不需要此项。其余命令与待验项目见[完整验收步骤](specs/001-demo-foundation/quickstart.md)。评测执行与 AI 分析的 Provider 属于后续切片。
 
 测试命令按目的区分：`npm run test:unit` 只测试代码逻辑，不需要 MySQL 测试库；`npm run test:integration` 才连接独立的 `simeval_test`，应用已有迁移、连续运行两次 Seed 并核对结果。首次使用集成测试前运行 `.\scripts\setup-local-db.ps1 -Database test`，它只建立测试库与账号，并写入被忽略的 `.env.test.local`；随后再运行 `npm run test:integration`。`npm test` 会运行所有 Vitest 用例，但没有测试库配置时会显示集成测试已跳过，不能当作集成测试通过。网页行为和视觉效果由项目负责人按照 [手工验收步骤](specs/001-demo-foundation/quickstart.md#浏览器走查) 在真实浏览器中检查，不运行自动浏览器测试。
 

@@ -49,6 +49,36 @@ describe("getOverview", () => {
     await expect(getOverview()).resolves.toBeNull();
   });
 
+  const fixture = () => ({
+    id: "project", name: "仓储操作评测", description: "合成演示", datasets: [],
+    runs: [
+      { id: "baseline", baselineRunId: null, status: "SUCCEEDED", episodeCount: 200, simulationSeed: 1, datasetVersionId: "dataset", benchmarkId: "benchmark", createdAt: new Date(), modelVersion: { name: "PickPlace", version: "v2.3" }, metricResults: [
+        { value: "76", sampleCount: 200, scenarioKey: "__overall__", metricDefinition: { key: "success_rate" } },
+        { value: "8", sampleCount: 50, scenarioKey: "occlusion", metricDefinition: { key: "collision_rate" } },
+      ], anomalies: [], reports: [] },
+      { id: "candidate", baselineRunId: "baseline", status: "SUCCEEDED", episodeCount: 200, simulationSeed: 1, datasetVersionId: "dataset", benchmarkId: "benchmark", createdAt: new Date(), modelVersion: { name: "PickPlace", version: "v2.4" }, metricResults: [
+        { value: "81", sampleCount: 200, scenarioKey: "__overall__", metricDefinition: { key: "success_rate" } },
+        { value: "13", sampleCount: 50, scenarioKey: "occlusion", metricDefinition: { key: "collision_rate" } },
+      ], anomalies: [{ status: "RESOLVED", reviewCategory: "DATA_ISSUE", backfills: [{ status: "OPEN" }] }], reports: [{ confirmedBy: { name: "陈复核" } }] },
+    ],
+  });
+
+  it("同口径结果生成判断，复核与回补分别计数", async () => {
+    stubs.getDemoProject.mockResolvedValue(fixture());
+    const result = await getOverview();
+    expect(result?.summary).toMatchObject({ conclusion: "总体表现提升，遮挡场景仍需处理。", completedRuns: 2, resolvedCount: 1, dataIssues: 1, pendingBackfills: 1, confirmedBy: "陈复核" });
+  });
+
+  it.each(["missing_metric", "different_dataset", "different_samples", "unfinished"])("%s 时不输出固定判断", async (reason) => {
+    const data = fixture();
+    if (reason === "missing_metric") data.runs[1].metricResults.pop();
+    if (reason === "different_dataset") data.runs[1].datasetVersionId = "other";
+    if (reason === "different_samples") data.runs[1].metricResults[1].sampleCount = 49;
+    if (reason === "unfinished") data.runs[1].status = "RUNNING";
+    stubs.getDemoProject.mockResolvedValue(data);
+    expect((await getOverview())?.summary.conclusion).toContain("暂不作版本判断");
+  });
+
   it("查询失败时传播错误，不能返回零值", async () => {
     stubs.getDemoProject.mockRejectedValue(new Error("database unavailable"));
     await expect(getOverview()).rejects.toThrow("database unavailable");

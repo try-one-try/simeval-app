@@ -1,5 +1,15 @@
 # Tasks: 演示工作台基础
 
+## 2026-09-26 新原型实施
+
+验证：lint、typecheck、21 项单元／组件测试、1 项独立 MySQL 集成测试、生产构建通过。数据库集成补查实际总览仓储的指标／异常／回补／确认人关联。代理浏览器已核对桌面与 375px、登录提交反馈、刷新、退出后受保护访问、菜单关闭与焦点恢复；空／错误有组件回归，尚无隔离实例中的真实浏览器故障记录。新视觉待负责人验收。
+
+- [x] R001 替换入口、总览、文字侧栏与全局 token，保留数据库与真实会话。
+- [x] R002 服务端整理固定故事摘要；缺数据不伪造结论，加载／空／错可恢复。
+- [x] R003 完成悬浮／点击展开、375px 菜单、键盘与减少动态效果支持。
+- [x] R004 lint、类型、相关单元、独立数据库集成与生产构建通过。
+- [ ] R005 代理浏览器走查与文档同步已完成；待项目负责人验收新视觉。
+
 **Inputs**: [spec.md](spec.md)、[plan.md](plan.md)、[research.md](research.md)、[data-model.md](data-model.md)、[quickstart.md](quickstart.md)  
 **Status**: Local stage 3 delivery accepted by the project owner on 2026-09-24; unchecked tasks remain incomplete or unverified and are not retroactively marked done
 
