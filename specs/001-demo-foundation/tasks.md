@@ -1,7 +1,7 @@
 # Tasks: 演示工作台基础
 
 **Inputs**: [spec.md](spec.md)、[plan.md](plan.md)、[research.md](research.md)、[data-model.md](data-model.md)、[quickstart.md](quickstart.md)  
-**Status**: Local stage 2 delivery accepted by the project owner on 2026-09-24; unchecked tasks remain incomplete or unverified and are not retroactively marked done
+**Status**: Local stage 3 delivery accepted by the project owner on 2026-09-24; unchecked tasks remain incomplete or unverified and are not retroactively marked done
 
 每项完成时勾选，并记录命令、结果与限制。`[P]` 只表示文件独立可并行处理，不要求使用多个代理。受控数据、认证和界面组成一个完整切片；任何阶段检查不能只凭文件存在判定通过。
 
@@ -93,6 +93,6 @@ T001–T004 后可进入 T005–T009。US1 依赖概览仓储、演示会话与 
 
 ## 阶段验收与推送前核对（2026-09-24）
 
-- 项目负责人确认阶段 2 的本地交付通过验收。此前已验证主要浏览器路径；空／错误状态的真实浏览器记录、全新电脑初始化脚本实跑仍未单独取得，保留为明确限制，不把相关未勾选任务追认完成。
+- 项目负责人确认阶段 3 的本地交付通过验收。此前已验证主要浏览器路径；空／错误状态的真实浏览器记录、全新电脑初始化脚本实跑仍未单独取得，保留为明确限制，不把相关未勾选任务追认完成。
 - 当前公开交付包含 13 项单元／组件测试和 1 项独立 MySQL 集成测试；原任务 T010、T019 的“先写失败测试”并未执行，测试策略与实际顺序如实保留。
 - 推送前核对：Git 根目录是 `simeval-app/`；`.env.local` 与 `.env.test.local` 被 `.gitignore` 忽略。对 84 个拟公开的项目文件进行了本机环境值匹配扫描，未发现本机凭据值。仓库公开文档未引用私人工作区路径。推送只应在本仓库提交后进行。

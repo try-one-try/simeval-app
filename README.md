@@ -4,7 +4,7 @@ SimEval 是面向具身智能团队的评测数据工作台。它围绕数据质
 
 ## 当前状态
 
-**阶段 2 的本地工程基础与阶段 1.5 的当前 Figma 原型已由项目负责人验收；工程尚未按新原型更新。** 已实现 Next.js 入口、受保护概览、Auth.js 会话、Prisma 迁移和确定性 Seed。本机已验证登录、持久化概览、刷新与退出；lint、类型检查、13 项单元／组件测试、1 项独立 MySQL 集成测试和生产构建通过。网页由项目负责人手工验收；空／错误状态的真实浏览器走查及全新电脑上的初始化脚本运行尚无单独记录，见[阶段任务清单](specs/001-demo-foundation/tasks.md)。项目只使用明确标注的合成数据和模拟评测，不运行真实仿真器或训练模型。OpenAPI 的 19 个业务操作仍是未来切片的契约草案。
+**阶段 3 的本地工程基础与阶段 2 的当前 Figma 原型已由项目负责人验收；工程尚未按新原型更新。** 已实现 Next.js 入口、受保护概览、Auth.js 会话、Prisma 迁移和确定性 Seed。本机已验证登录、持久化概览、刷新与退出；lint、类型检查、13 项单元／组件测试、1 项独立 MySQL 集成测试和生产构建通过。网页由项目负责人手工验收；空／错误状态的真实浏览器走查及全新电脑上的初始化脚本运行尚无单独记录，见[阶段任务清单](specs/001-demo-foundation/tasks.md)。项目只使用明确标注的合成数据和模拟评测，不运行真实仿真器或训练模型。OpenAPI 的 19 个业务操作仍是未来切片的契约草案。
 
 ## 黄金路径
 
@@ -19,7 +19,7 @@ SimEval 是面向具身智能团队的评测数据工作台。它围绕数据质
 | 架构与数据边界  | [架构设计](docs/architecture.md)                                    | 本地迁移、Seed 与独立测试库集成测试已通过            |
 | HTTP 接口  | [OpenAPI 契约](docs/openapi.yaml)、[请求与响应示例](docs/api-contract.md) | 19 个业务接口仍是设计稿；Auth.js 自有会话路由已接入源码  |
 | 项目原则     | [Spec Kit constitution](.specify/memory/constitution.md)        | 已确定的开发约束                           |
-| 功能规格     | [演示工作台基础](specs/001-demo-foundation/spec.md)                    | 阶段 2 本地交付已签收；任务清单保留未单独核验项          |
+| 功能规格     | [演示工作台基础](specs/001-demo-foundation/spec.md)                    | 阶段 3 本地交付已签收；任务清单保留未单独核验项          |
 | 代理协作     | [AGENTS.md](AGENTS.md)                                          | 公开仓库的工作规则                          |
 
 
@@ -31,7 +31,7 @@ SimEval 是面向具身智能团队的评测数据工作台。它围绕数据质
 
 1. **产品判断**：先看 [Figma 原型](https://www.figma.com/design/Y2ZIhN1yuuXBeieGkxtnsH/Untitled?node-id=11-2)中的结论、指标与异常证据，再读[演示工作台基础规格](specs/001-demo-foundation/spec.md)；完整业务功能仍需后续切片实现。上线后 README 将提供演示地址与短导览。
 2. **API 能力**：[OpenAPI](docs/openapi.yaml) 是机器可读契约，[请求与响应示例](docs/api-contract.md)展示质量门禁、复核、并发冲突和报告证据。
-3. **架构与协作**：[架构设计](docs/architecture.md)说明模块边界；[项目原则](.specify/memory/constitution.md)约束实施；[阶段 2 任务](specs/001-demo-foundation/tasks.md)区分已完成与待验收工作。
+3. **架构与协作**：[架构设计](docs/architecture.md)说明模块边界；[项目原则](.specify/memory/constitution.md)约束实施；[阶段 3 任务](specs/001-demo-foundation/tasks.md)区分已完成与待验收工作。
 
 目标体验是让首次进入的面试官在三分钟内看清“总体提升但遮挡场景回退 → 样本原因不同 → 人工确认结论”。完整写入流程和跨角色权限另有验收路径，不要求在快速导览中逐项操作。此处描述的是交付目标，不代表在线体验已经完成。
 

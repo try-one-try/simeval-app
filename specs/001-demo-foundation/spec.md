@@ -2,8 +2,8 @@
 
 **Feature directory**: `specs/001-demo-foundation`  
 **Created**: 2026-09-23  
-**Status**: Local stage 2 delivery accepted by the project owner; remaining evidence is listed in tasks.md  
-**Input**: 阶段 2 工程基础；让面试官便捷进入真实会话，看到持久化、可重复的合成故事及清晰的工作台入口。
+**Status**: Local stage 3 delivery accepted by the project owner; remaining evidence is listed in tasks.md
+**Input**: 阶段 3 工程基础；让面试官便捷进入真实会话，看到持久化、可重复的合成故事及清晰的工作台入口。
 
 ## User Scenarios & Testing
 

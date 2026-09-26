@@ -21,11 +21,11 @@ Auth.js 管理的 `/api/auth/*` 供浏览器会话使用，内部 CSRF、回调�
 
 ## 2. 通用约定
 
-- **身份**：Auth.js Session Cookie。OpenAPI 中的 `authjs.session-token` 是开发环境占位名称；具体 cookie 名、Secure 前缀与会话配置在阶段 2 固定。Cookie 不是角色授权，Route Handler 仍需校验 Session 与服务端角色。
+- **身份**：Auth.js Session Cookie。OpenAPI 中的 `authjs.session-token` 是开发环境占位名称；具体 cookie 名、Secure 前缀与会话配置在阶段 3 固定。Cookie 不是角色授权，Route Handler 仍需校验 Session 与服务端角色。
 - **统一响应**：成功 `{ "data": ..., "meta": { "requestId": "..." } }`；列表的 `meta` 另含 `page`、`pageSize`、`total`。错误 `{ "error": { "code": "...", "message": "...", "fieldErrors": null, "requestId": "..." } }`。`fieldErrors` 为字段名到消息数组的映射或 `null`。
 - **分页**：`page` 从 1 开始，`pageSize` 默认 20、最大 100；默认创建时间倒序。列表查询失败不能以空数组伪装。
 - **校验**：写操作在服务端依序做身份、角色、Zod 结构校验和领域规则检查。Path、Query、Body、幂等头都要校验；客户端预校验只改善体验。
-- **幂等**：创建评测、重试、创建回补、生成报告需要 `Idempotency-Key`。同一操作者、同一操作、同一键和同一请求体，首次返回 201，重放返回 200 与原资源；同键不同请求体返回 409 `IDEMPOTENCY_CONFLICT`。键不得跨用户复用推断他人资源。具体持久化结构在阶段 2 落地。
+- **幂等**：创建评测、重试、创建回补、生成报告需要 `Idempotency-Key`。同一操作者、同一操作、同一键和同一请求体，首次返回 201，重放返回 200 与原资源；同键不同请求体返回 409 `IDEMPOTENCY_CONFLICT`。键不得跨用户复用推断他人资源。具体持久化结构在阶段 3 落地。
 - **乐观并发**：指派、复核与重开带 `expectedVersion`；版本不符返回 409 `VERSION_CONFLICT`，不覆盖他人结论。
 - **状态同步**：`GET /status` 只读；`POST /sync` 根据服务器时间推进模拟任务，重复或并发调用只能生成一份结果。这个拆分避免 GET 暗中写库。
 - **证据**：对比指标返回单位、方向和 evidenceCount；报告只能引用当前任务真实存在的样本编号，草稿必须显著标为未经人工确认。
@@ -74,7 +74,7 @@ OpenAPI 中各操作列出的 HTTP 响应是计划覆盖；具体业务 code 由
 | 取消与完成并发 | 允许取消 QUEUED/RUNNING；通过条件更新确保取消和完成只有一方成功 | 取消接口已列，精确状态机待确认 |
 | 对比数据集口径 | 基线与候选应使用同一数据集版本和 Benchmark | 当前仅强制同 Benchmark 和成功状态 |
 | 重复回补 | 一个样本同一时间最多一个未完成回补任务 | 具体唯一约束待落地 |
-| 会话与 Provider | 实现时固定 Cookie、CSRF/Origin 策略、AI 超时与降级阈值 | 阶段 2/6 决定，当前未实现 |
+| 会话与 Provider | 实现时固定 Cookie、CSRF/Origin 策略、AI 超时与降级阈值 | 阶段 3/6 决定，当前未实现 |
 
 这些未决项在进入对应切片前由功能规格明确，并同步改动 OpenAPI、架构设计、数据模型实现与测试。
 
