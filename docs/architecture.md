@@ -1,54 +1,77 @@
 # SimEval 架构设计
 
-**状态：架构边界已确定，阶段 3 本地交付已签收。** Next.js 应用源码、Prisma schema、迁移 SQL、仓储与会话代码已建立；本地开发库的初始迁移、两次 Seed、演示登录与持久化概览路径，以及独立测试库的集成测试已通过。空／错误状态的真实浏览器走查仍缺单独记录。评测与 AI Provider 尚未运行。设计与实现差异以对应功能规格和代码核对。
+**2026-09-27：按认可的产品原型修订目标架构；本次未改代码或数据库。** 已运行的是工程基础和第一版质量／评测；两个身份、自主配置、任务上下文与删除仍待改造。行为看[规格](../specs/002-quality-evaluation/spec.md)，HTTP 字段和实现状态看 [OpenAPI](openapi.yaml)。
 
-## 当前界面与读取链路
+## 1. 运行边界
 
-新版入口、文字侧栏与响应式总览按已确认 Figma 实现。路由 `overview/page.tsx` 调用 `get-overview.ts`，由 `overview-repository.ts` 读取预置任务的指标、异常、回补和确认人，应用层检查比较口径并组装 DTO，再交给 `features/overview/overview-view.tsx` 展示。导航／菜单和提交反馈是小型客户端组件；身份、密钥与查询仍在服务端。仅查询已有数据，没有新迁移或新增业务 HTTP 接口。
+Next.js、TypeScript、Auth.js、Prisma、MySQL 组成模块化单体，一个应用部署。合成数据、预置质量报告、模拟执行与缓存报告必须标注；不运行真实仿真、训练或 ETL。不增加微服务、队列、Worker 或 WebSocket。
 
-## 产品与运行边界
+## 2. 文件与调用关系
 
-SimEval 是具身智能团队的评测数据工作台。黄金路径从数据集质量检查开始，经模拟评测、版本对比、异常样本复核和数据回补，最终生成并人工确认报告。界面与业务流程计划真实实现；数据质量结果、评测执行和演示样本采用确定性的合成数据。系统不运行真实机器人仿真器、不训练模型，也不建设通用数据 ETL。
-
-## 计划中的模块化单体
-
-| 层 | 职责 |
+| 位置 | 职责 |
 |---|---|
-| Next.js 页面与 Server Component | 页面组合与首屏读取；不保存业务规则 |
-| Route Handler | 客户端写操作、轮询与 AI 请求的 HTTP 入口；统一处理身份、角色、参数、错误和幂等 |
-| 应用服务 | 完成一次业务动作，组织领域规则、Provider、仓储与事务 |
-| 领域层 | 数据质量门禁、评测与复核状态机、指标比较规则、报告证据规则 |
-| 仓储层 | 隔离 Prisma 对 MySQL 的访问；页面组件不直接写数据库 |
-| Provider | `MockEvaluationProvider` 提供可重复的模拟评测；`InsightProvider` 隔离 AI 分析并提供缓存或降级实现 |
+| `src/app/(workspace)/` | 核对会话，组合各板块页面 |
+| `src/features/` | 表单、任务选择、结果与交互状态；客户端不访问 Prisma |
+| `src/app/api/`、`src/server/http/api.ts` | HTTP 入口；身份／角色／Origin／Zod、统一错误和 requestId |
+| `src/server/application/` | 组织完整用例，输出不含密钥的 DTO |
+| `src/domain/evaluation.ts` | 质量、配置、权限与状态的纯业务规则 |
+| `src/server/repositories/` | Prisma 查询、条件更新与事务 |
+| `src/server/providers/` | 可替换 EvaluationProvider；现有确定性 Mock |
+| `src/server/db.ts`、`prisma/` | 连接池、Schema、追加迁移和幂等 Seed |
+| `tests/unit`、`tests/integration` | 规则／HTTP 边界与独立 MySQL 集成验证 |
 
-```mermaid
+~~~mermaid
 flowchart LR
-  B[浏览器] --> P[Next.js 页面与 Server Component]
-  B --> H[Route Handler]
-  P --> A[应用服务]
-  H --> V[身份、角色与 Zod 校验]
-  V --> A
+  B[浏览器] --> P[服务端页面]
+  B --> H[HTTP 入口与校验]
+  P --> A[应用服务与 DTO]
+  H --> A
   A --> D[领域规则]
-  A --> R[仓储接口]
-  A --> E[评测 Provider 接口]
-  A --> I[AI Insight Provider 接口]
-  R --> DB[(MySQL / Prisma)]
-  E --> M[确定性模拟评测]
-  I --> C[缓存或 AI 服务]
-```
+  A --> R[事务仓储]
+  R --> E[现有 Mock 纯计算]
+  R --> DB[(MySQL)]
+~~~
 
-箭头表示调用方向，不表示独立部署；这些模块都位于同一应用中。仓储和 Provider 实现通过接口进入应用服务，路由层不直接写数据库。
+首屏由 Server Component 直接调用应用服务；浏览器交互通过 HTTP。当前 Mock 在事务内只做本地纯计算；未来外部执行与 AI 网络请求放到事务外，校验结果后用短事务保存。
 
-采用 Next.js、TypeScript、Prisma、MySQL、Auth.js；不引入微服务、消息队列或 WebSocket。客户端组件不得访问 Prisma、密钥或仅服务端可用的模块。
+## 3. 新产品怎样映射到工程
 
-## 数据与关键事务
+| 产品行为 | 工程边界 |
+|---|---|
+| ENGINEER／REVIEWER 二选一 | 服务端建立对应会话；导航随角色变化，权限重新查数据库 |
+| 配置 → 质量确认 → 创建 | 目录返回兼容组合；服务端复查版本、范围和质量，保存配置快照 |
+| 基线可选 | 无基线也能模拟；比较时才要求两个成功且同口径的任务 |
+| 多任务选择／延续 | URL 和请求明确携带 runId；侧栏先选，正文按钮延续，不能自动覆盖成最近任务 |
+| 取消／重试／删除 | 本人权限＋状态校验；重试新 ID；删除用可见性标记，保留引用 |
+| 草稿／最终结论 | 两者分开保存；版本保护、历史、审计与报告失效一起写入 |
+| 报告 | 输入由服务端组装；校验指标／样本引用；评测人员确认，过时报告保留历史 |
 
-主要实体包括用户与角色、项目、模型版本、数据集版本、质量检查、Benchmark、评测任务、指标结果、异常样本、复核记录、回补任务、AI 报告和审计记录。阶段 3 已写出 [Prisma schema](../prisma/schema.prisma) 与初始迁移 SQL，并在项目专用数据库和独立测试库应用迁移、两次写入 Seed；测试库已核对固定记录、关系和重复运行结果。唯一约束冲突、索引表现和后续下钻查询的集成验证属于后续功能切片。
+总览目标是所选任务概况；当前代码仍只查询固定故事。未完成任务只展示状态，没有基线不伪造比较，没有结果不伪造异常。指标按 Benchmark 定义，目录变化必须影响结果口径。
 
-- 生成评测结果时，任务状态、指标、异常样本与审计记录保持一致。
-- 完成复核并按需创建回补任务时，复核结论、样本状态、回补任务与审计记录同事务提交。
-- 生成报告时，服务端组装有限输入，校验指标和样本证据后保存草稿；人工确认是独立的受权状态流转。
+## 4. 数据变化（待迁移）
 
-## 契约与待决事项
+以下是**新增字段方案，不是当前 Schema 的完成清单**。实施前在计划中定稿，再追加迁移；不 reset，不覆盖已有非预置数据。
 
-[OpenAPI 契约](openapi.yaml)是 HTTP 方法、参数、响应和错误的机器可读出处；[接口说明与示例](api-contract.md)保留黄金路径示例与尚待决定的业务细节。具体功能的可验收行为写入 `specs/<功能>/spec.md`，实现前解决该切片涉及的未决项。这里的设计文字不证明接口已实现。
+| 对象 | 目标变化 |
+|---|---|
+| EvaluationRun | 现有 name 应在新建时必填；baselineRunId 已可空，但当前 API 仍必填。拟加 successRateThreshold（可空 0.8／0.85）、configurationSnapshotJson、deletedAt／deletedById |
+| 模型／数据／Benchmark 目录 | 增加兼容信息与 Episode 范围，Seed 提供可选择的版本及三种质量状态；兼容矩阵在编码前固定 |
+| AnomalySample | 拟分开 draftConclusion 与已确认 conclusion，保存修改人／时间、confirmedById／confirmedAt 和 confirmedRevision；现有 version 用于所有编辑防覆盖 |
+| ReviewRecord | 只追加每次草稿／确认／修改的内容、操作者、时间与来源版本，不要求人工分类 |
+| AIReport | 输入快照保存指标、证据和 sourceReviewVersions（样本 ID → 确认版本）；拟加 isStale／staleAt。过时报告保留原确认历史，当前入口提示重生成 |
+
+草稿保存只增加编辑 version；最终结论内容改变才增加 confirmedRevision 并令旧报告过时。报告确认时再次核对来源版本，避免“生成时有效、确认时已过期”。
+
+当前 Schema／Seed 仍含 ADMIN、分类和 BackfillTask；这是旧数据事实。新产品不开放第三角色、分类步骤或回补管理；迁移需保留历史关联，再决定兼容字段处理。演示目标为各一个工程师和评测人员，模拟 Seed 与数据库 Seed 分别负责结果复现和初始化故事。
+
+## 5. 当前可运行行为与写入保护
+
+现有八个操作读取质量、创建／列出／读取任务、读取状态、同步、取消和重试。当前创建仍依赖成功基线；Mock 用基线加固定增量生成四项指标和两条异常。
+
+- GET 只读；POST sync 按服务器时间每次推进一段，约 2 秒运行、12 秒完成，没有后台执行。运行中 progress 为 null。
+- 成功的指标、异常、终态和审计同事务提交，重复同步不重复写。
+- 取消仅允许 QUEUED／RUNNING；条件更新和事务处理完成竞争。失败重试新建任务并保留 retryOfRunId。
+- 创建／重试按用户＋操作＋幂等键和请求摘要识别；同键不同内容拒绝。并发冲突有限重试。
+- 新复核用 expectedVersion 防覆盖；软删除过滤普通列表，已有基线／证据引用仍可内部解析。审计只追加。
+
+Schema 改动后生成 Client、应用迁移、重启旧服务，再验网页。新版本相关测试与手工验收看 [Quickstart](../specs/002-quality-evaluation/quickstart.md)；旧测试通过不代表新设计已实现。

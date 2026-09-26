@@ -3,6 +3,8 @@
 **日期**：2026-09-23  
 **范围**：只支持 [演示工作台基础规格](spec.md)。以下是编码前决策和环境核对，不表示依赖已安装或功能已实现。
 
+后续产品变化与迁移以 [当前架构](../../docs/architecture.md) 和 [002 规格](../002-quality-evaluation/spec.md)为准；本文保留当时技术决策，不作为新版产品规则。
+
 ## R-001 · Next.js 工程入口
 
 **决策**：在现有独立仓库内建立单个 Next.js App Router 项目，保留 TypeScript、ESLint、Tailwind 与 `src/` 结构。生产构建、lint、类型检查分别执行；不能认为构建自动完成 lint。Node.js 22.17.1 满足官方最低 20.9 要求。

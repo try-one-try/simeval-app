@@ -1,7 +1,9 @@
 # Implementation Plan: 演示工作台基础
 
 **Feature directory**: `specs/001-demo-foundation` | **Date**: 2026-09-23 | **Spec**: [spec.md](spec.md)  
-**Status**: 基础数据与认证已交付；按已确认 Figma 重做阶段 3 界面
+**Status**: 基础数据／认证与 2026-09-26 新视觉已交付并获负责人认可；保留当时范围。
+
+新版双身份、自主创建与任务上下文由 [002 计划](../002-quality-evaluation/plan.md)承接，尚待工程改造。
 
 ## Summary
 

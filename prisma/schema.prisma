@@ -157,6 +157,10 @@ model MetricDefinition {
 
 model EvaluationRun {
   id                 String          @id @default(cuid()) @db.VarChar(64)
+  // 旧固定任务兼容空名称；新任务记录名称、幂等指纹和显式故障演示选项。
+  name               String?         @db.VarChar(120)
+  requestFingerprint String?         @db.VarChar(64)
+  mockFailure        Boolean         @default(false)
   projectId          String          @db.VarChar(64)
   modelVersionId     String          @db.VarChar(64)
   datasetVersionId   String          @db.VarChar(64)

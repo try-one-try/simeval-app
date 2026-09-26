@@ -1,4 +1,5 @@
 // 总览展示只消费应用层 DTO；详细业务操作随后续切片开放。
+import Link from "next/link";
 import type { OverviewData } from "@/server/application/get-overview";
 const qualityLabels = { PASSED: "已通过", WARNING: "需关注", FAILED: "未通过" } as const;
 export function OverviewView({ overview }: { overview: OverviewData | null }) {
@@ -29,6 +30,6 @@ export function OverviewView({ overview }: { overview: OverviewData | null }) {
       <div><dt>复核</dt><dd>{summary.resolvedCount} / {summary.sampleCount} 已复核；{summary.pendingBackfills} 条待处理回补</dd></div>
       <div><dt>报告</dt><dd>{summary.confirmedBy ? `已确认 · ${summary.confirmedBy}` : "尚无已确认报告"}</dd></div>
     </dl>
-    <div className="overview-actions"><button className="primary-button" disabled type="button">查看模型对比 →</button><span className="fine-print">详情操作将在后续阶段开放，当前总览为只读。</span></div>
+    <div className="overview-actions"><button className="primary-button" disabled type="button">查看模型对比 →</button><Link href="/quality" className="text-action">查看数据质量 →</Link></div>
   </main>;
 }

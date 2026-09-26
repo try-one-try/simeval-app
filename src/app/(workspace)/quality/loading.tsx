@@ -1,0 +1,1 @@
+export default function Loading() { return <section className="content state-content" role="status"><p className="breadcrumb">正在读取已保存的质量报告…</p><div className="skeleton" /><div className="skeleton short" /></section>; }

@@ -8,7 +8,7 @@ if (!process.env.TEST_DATABASE_URL && !existsSync('.env.test.local')) {
 }
 
 try {
-  execFileSync(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', 'tests/integration'], { stdio: 'inherit' });
+  execFileSync(process.execPath, ['node_modules/vitest/vitest.mjs', 'run', 'tests/integration', '--no-file-parallelism'], { stdio: 'inherit' });
 } catch (error) {
   process.exitCode = error?.status || 1;
 }

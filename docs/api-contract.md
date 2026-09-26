@@ -1,363 +1,169 @@
-# SimEval HTTP 接口契约（编码前草案）
+# SimEval HTTP 接口说明
 
-**状态：19 个业务接口仍是设计稿。** [openapi.yaml](openapi.yaml) 是计划中的业务 HTTP 方法、路径、参数、请求响应结构与角色的机器可读契约；本文件保存接口约定、黄金路径请求和成功／错误响应示例。项目的实现边界见[架构设计](architecture.md)，具体功能行为由对应的 `specs/<功能>/spec.md` 固定。实现每个接口时需更新本目录，并用实现与测试核对契约，不能因为文件存在就声称接口可用。
+[OpenAPI](openapi.yaml) 是方法、字段与实现状态的权威契约。本文解释调用和取舍；认证会话由 Auth.js 管理，不把其内部路由算成业务 API。
 
-格式遵循 [OpenAPI 3.1](https://spec.openapis.org/oas/v3.1.0)；Next.js Route Handler 是计划中的业务 HTTP 入口。当前 `src/app/api/auth/[...nextauth]` 已接入 Auth.js 框架会话路由，本地数据库演示登录、概览刷新和退出已通过浏览器走查；跨角色及异常状态仍待验收。19 个业务 Route Handler 均未实现。
+## 1. 先分清可调用与待实施
 
-Auth.js 管理的 `/api/auth/*` 供浏览器会话使用，内部 CSRF、回调、Cookie 和错误响应遵循所锁定的 Auth.js 版本，不属于下方统一业务 JSON 响应契约。入口页通过服务端动作发起 Credentials 登录；成功后进入 `/overview`，失败或未配置时不能读取受保护概览。客户端不得把 Auth.js 内部路由当作稳定的第三方集成接口。
+**2026-09-27 文档版本 0.4.0。** 现有八个质量／评测操作保留第一版实际契约；新原型认可不等于接口已改造。
 
-## 1. 当前接口覆盖
+| 状态 | 内容 |
+|---|---|
+| implemented | 质量读取、任务创建／列表／详情、状态读取、同步、取消、重试 |
+| x-target-*（待改造） | 已有接口的新目标：双角色、可选基线、自主目录和目标值、过滤软删除 |
+| planned | 目录、软删除、比较、异常读取／结论编辑、报告生成／确认 |
+| needs-detail | 指派／重开保留后续草案，尚不纳入当前主线 |
 
-| 模块 | 操作 | 当前状态 |
-|---|---|---|
-| 数据质量 | GET 质量摘要 | 设计稿 |
-| 评测 | 列表、创建、详情、只读状态、模拟同步、取消、失败重试 | 设计稿 |
-| 对比 | GET 基线与候选指标 | 设计稿 |
-| 异常 | 列表、详情、指派、复核、重开 | 设计稿 |
-| 回补 | 创建、更新 | 设计稿 |
-| 报告 | 生成、详情、人工确认 | 设计稿 |
+新产品只有 ENGINEER／REVIEWER。工程师管理本人任务、编辑草稿、生成／阅读报告；评测人员确认结论／报告。当前 implemented 仍允许旧 ADMIN，创建仍必填 baselineRunId；实际变更通过测试后再更新契约。独立回补和人工分类已从计划接口移除，旧数据库历史保留。
 
-当前为 **19 个操作**。页面首屏读取可由 Server Component 直接调用应用查询服务，不一定需要一一对应的 GET HTTP 接口；写操作始终有服务端入口和契约。
+## 2. 公共规则
 
-## 2. 通用约定
+- **身份与写入**：校验 Session 和数据库角色；写入要求同源 Origin、Zod 与业务权限。当前八个操作写入均为 POST；后续 PATCH／DELETE 同样受保护。
+- **输入与分页**：ID 长 1–64，仅字母／数字／下划线／连字符；Body 拒绝多余字段。任务名 trim 后 1–120 字，Episode 1–10000，Seed 0–2147483647；新版另按目录收紧 Episode。page 从 1，pageSize 默认 20／最多 100，时间倒序＋ID 稳定排序。
+- **响应**：成功 `{data,meta:{requestId}}`；错误 `{error:{code,message,fieldErrors,requestId}}`。fieldErrors 为字段消息数组映射或 null；不泄漏 SQL、密码或堆栈。
+- **幂等**：创建／重试／计划的报告生成带 1–128 字符 Idempotency-Key。同用户／操作／键及内容重复返回原对象；同键换内容 409。创建首次 201，重复 200。
+- **四个标识**：requestId 跟踪一次请求；runId 定位任务；幂等键识别重复动作；expectedVersion 防止编辑覆盖。
 
-- **身份**：Auth.js Session Cookie。OpenAPI 中的 `authjs.session-token` 是开发环境占位名称；具体 cookie 名、Secure 前缀与会话配置在阶段 3 固定。Cookie 不是角色授权，Route Handler 仍需校验 Session 与服务端角色。
-- **统一响应**：成功 `{ "data": ..., "meta": { "requestId": "..." } }`；列表的 `meta` 另含 `page`、`pageSize`、`total`。错误 `{ "error": { "code": "...", "message": "...", "fieldErrors": null, "requestId": "..." } }`。`fieldErrors` 为字段名到消息数组的映射或 `null`。
-- **分页**：`page` 从 1 开始，`pageSize` 默认 20、最大 100；默认创建时间倒序。列表查询失败不能以空数组伪装。
-- **校验**：写操作在服务端依序做身份、角色、Zod 结构校验和领域规则检查。Path、Query、Body、幂等头都要校验；客户端预校验只改善体验。
-- **幂等**：创建评测、重试、创建回补、生成报告需要 `Idempotency-Key`。同一操作者、同一操作、同一键和同一请求体，首次返回 201，重放返回 200 与原资源；同键不同请求体返回 409 `IDEMPOTENCY_CONFLICT`。键不得跨用户复用推断他人资源。具体持久化结构在阶段 3 落地。
-- **乐观并发**：指派、复核与重开带 `expectedVersion`；版本不符返回 409 `VERSION_CONFLICT`，不覆盖他人结论。
-- **状态同步**：`GET /status` 只读；`POST /sync` 根据服务器时间推进模拟任务，重复或并发调用只能生成一份结果。这个拆分避免 GET 暗中写库。
-- **证据**：对比指标返回单位、方向和 evidenceCount；报告只能引用当前任务真实存在的样本编号，草稿必须显著标为未经人工确认。
-- **事务**：评测结果、复核记录、回补任务与审计等关联写入遵循[架构设计](architecture.md)中的事务边界。HTTP 成功响应只在事务提交后发出。
+## 3. 当前状态与模拟逻辑
 
-## 3. HTTP 错误与业务 code
+PASSED 可创建，WARNING 明确接受，FAILED 阻断。当前要求成功基线且同项目／数据／Benchmark／Episode／Seed、不同模型版本；新目标是无基线也可创建，仅比较才校验基线。
 
-| HTTP | code | 触发条件 |
-|---|---|---|
-| 401 | `UNAUTHENTICATED` | 无有效 Session |
-| 403 | `FORBIDDEN` | 已登录，但该角色不能执行操作 |
-| 404 | `NOT_FOUND` | 资源不存在或按权限不可见 |
-| 409 | `STATE_CONFLICT` | 终态任务取消、非 FAILED 任务重试、非法复核或回补流转 |
-| 409 | `VERSION_CONFLICT` | `expectedVersion` 与当前版本不同 |
-| 409 | `IDEMPOTENCY_CONFLICT` | 幂等键与首次请求内容不同 |
-| 422 | `VALIDATION_ERROR` | 结构、字段、范围或分页参数不合法 |
-| 422 | `QUALITY_WARNING_NOT_ACCEPTED` | WARNING 数据集未显式确认 |
-| 422 | `DATASET_QUALITY_BLOCKED` | FAILED 数据集禁止评测 |
-| 422 | `INCOMPATIBLE_CONFIGURATION` | 模型、数据集或 Benchmark 不兼容，或两个任务不能同口径比较 |
-| 422 | `INVALID_EVIDENCE` | AI 输出引用不存在的指标或样本 |
-| 503 | `EXTERNAL_SERVICE_ERROR` | Provider 调用失败或超时；历史报告不删除 |
-| 500 | `INTERNAL_ERROR` | 未预期服务端错误；响应不暴露密钥、SQL 或堆栈 |
+创建保存 QUEUED；POST sync 满 2 秒可进入 RUNNING、满 12 秒可完成，每次推进一段，无后台执行。GET 始终只读，运行中 progress 为 null。当前 Mock 用基线固定增量生成四项指标和两条 OPEN 异常，结果／终态／审计同事务提交，不代表执行真实 Episode。
 
-OpenAPI 中各操作列出的 HTTP 响应是计划覆盖；具体业务 code 由应用错误映射到上表。发布实现前，需补充每个操作的测试断言与成功／失败示例。
+QUEUED／RUNNING 可取消，完成竞争返回最新状态或 409；FAILED 重试新 ID 并保留 retryOfRunId。重试重新检查配置／质量，沿用审计中的真实警告接受；未接受的新 WARNING 返回 422。mockFailure 是故障展示，重试默认清除。
 
-## 4. 关键操作细则
+## 4. 可执行请求示例
 
-### 创建评测
-
-`WARNING` 需 `acceptQualityWarning: true`；`FAILED` 无论该字段为何都拒绝。验证模型、数据集和 Benchmark 属于兼容项目；基线任务必须已成功且能比较。成功创建 `QUEUED` 任务，并记录操作者、配置、质量警告接受情况与审计。
-
-### 复核与回补
-
-`POST /review` 的 `resolve: false` 是保存复核内容；`resolve: true` 仅 REVIEWER/ADMIN，且必须已有负责人、分类和非空人工结论。`createBackfillTask: true` 仅允许 DATA_ISSUE/INVALID_SAMPLE，并与复核及审计同事务完成。若通过复核操作已建回补任务，客户端不应再调用独立创建接口；独立接口用于后续单独建任务。每个样本重复创建回补任务的唯一性规则仍需在数据模型中最终确定。
-
-`POST /api/anomaly-samples/{sampleId}/reopen` 是独立操作，仅 REVIEWER/ADMIN 可用。仅 `RESOLVED` 可重开；请求必须包含去除首尾空白后非空的 `reason` 和 `expectedVersion`。成功后状态为 `REOPENED`，保留负责人，清空当前分类、结论和解决时间；旧结论与重开原因留在复核历史和审计中。新草稿保存后进入 `IN_REVIEW`，需要重新满足解决条件。状态不符返回 409 `STATE_CONFLICT`，版本不符返回 409 `VERSION_CONFLICT`。
-
-### 报告
-
-报告请求只传任务 ID；服务端组装有限输入快照，调用 InsightProvider，校验结构、指标和样本编号，再保存 `READY` 草稿。确认接口仅 REVIEWER/ADMIN，可将 READY 改为 CONFIRMED，并记录确认人和时间。Provider 失败返回 503，不能删掉历史报告。
-
-## 5. 尚待决定，不可默认为已实现
-
-| 待决事项 | 建议默认方案 | 当前契约状态 |
-|---|---|---|
-| 取消与完成并发 | 允许取消 QUEUED/RUNNING；通过条件更新确保取消和完成只有一方成功 | 取消接口已列，精确状态机待确认 |
-| 对比数据集口径 | 基线与候选应使用同一数据集版本和 Benchmark | 当前仅强制同 Benchmark 和成功状态 |
-| 重复回补 | 一个样本同一时间最多一个未完成回补任务 | 具体唯一约束待落地 |
-| 会话与 Provider | 实现时固定 Cookie、CSRF/Origin 策略、AI 超时与降级阈值 | 阶段 3/6 决定，当前未实现 |
-
-这些未决项在进入对应切片前由功能规格明确，并同步改动 OpenAPI、架构设计、数据模型实现与测试。
-
-## 6. 接口变更记录规则
-
-每次新增或修改 HTTP 接口，在同一切片中更新：`openapi.yaml` 的请求／响应／错误／角色、本文件的代表性请求及成功与失败例、对应的公开功能规格与相关测试。工程初始化后将 OpenAPI 校验纳入自动检查。接口状态从“设计稿”变为“已实现”须有真实 Route Handler、测试和浏览器证据。
-
-## 7. 设计变更记录
-
-| 日期 | 版本 | 内容 |
-|---|---|---|
-| 2026-09-23 | 0.1.0-draft | 将接口清单细化为 OpenAPI、请求与响应示例；增加只读 GET 状态与 POST 模拟同步的边界；记录待决状态机与对比口径。 |
-| 2026-09-23 | 0.2.0-draft | 确定异常样本重开状态流转，新增独立重开接口、并发与错误约定。 |
-
-## 8. 黄金路径请求示例
-
-以下请求使用合成 ID 和占位 Session Cookie，仅用于审阅契约。复制单个请求时，可从本节代码块取用。
+先从网页进入演示会话，HTTP 客户端使用自己的本地 Session Cookie。不要保存或上传真实 Cookie。
 
 ```http
-# SimEval HTTP 示例（设计稿，未实现）
-# 合成 ID 与数值仅用于固定演示故事。不要将真实 Session Cookie 写入仓库。
 @baseUrl = http://localhost:3000
-@sessionCookie = REPLACE_WITH_LOCAL_SESSION_COOKIE
+@sessionCookie = REPLACE_WITH_LOCAL_COOKIE_HEADER
 
-### 1. 获取数据集质量
-GET {{baseUrl}}/api/datasets/dataset_warehouse_v3/quality
+### 质量报告：200，四项检查
+GET {{baseUrl}}/api/datasets/demo-dataset-scenes-v3/quality
 Cookie: {{sessionCookie}}
 
-### 2. 创建候选评测；WARNING 需显式确认
+### 首次创建 201，同键同内容重复 200
 POST {{baseUrl}}/api/evaluation-runs
 Cookie: {{sessionCookie}}
+Origin: http://localhost:3000
 Content-Type: application/json
-Idempotency-Key: create-run-v24-001
+Idempotency-Key: interview-evaluation-001
 
 {
-  "name": "v2.4 仓储抓取评测",
-  "modelVersionId": "model_v24",
-  "datasetVersionId": "dataset_warehouse_v3",
-  "benchmarkId": "benchmark_warehouse_pick",
-  "baselineRunId": "run_baseline_v23",
+  "name": "v2.4 仓储操作评测",
+  "modelVersionId": "demo-model-candidate",
+  "datasetVersionId": "demo-dataset-scenes-v3",
+  "benchmarkId": "demo-benchmark-v1",
+  "baselineRunId": "demo-run-baseline",
   "episodeCount": 200,
   "simulationSeed": 20260901,
-  "acceptQualityWarning": true
+  "acceptQualityWarning": true,
+  "mockFailure": false
 }
 
-### 3. 同步模拟任务，再只读获取状态
-POST {{baseUrl}}/api/evaluation-runs/run_candidate_v24/sync
+### 将返回的 data.id 填入此处
+@runId = REPLACE_WITH_CREATED_RUN_ID
+
+### 列表
+GET {{baseUrl}}/api/evaluation-runs?page=1&pageSize=20
+Cookie: {{sessionCookie}}
+
+### 详情与只读状态
+GET {{baseUrl}}/api/evaluation-runs/{{runId}}
 Cookie: {{sessionCookie}}
 
 ###
-GET {{baseUrl}}/api/evaluation-runs/run_candidate_v24/status
+GET {{baseUrl}}/api/evaluation-runs/{{runId}}/status
 Cookie: {{sessionCookie}}
 
-### 4. 同口径比较
-GET {{baseUrl}}/api/comparisons?baselineRunId=run_baseline_v23&candidateRunId=run_candidate_v24&scenarioKey=occlusion
+### 满 2 秒同步运行，满 12 秒再次同步完成
+POST {{baseUrl}}/api/evaluation-runs/{{runId}}/sync
 Cookie: {{sessionCookie}}
+Origin: http://localhost:3000
 
-### 5. 从遮挡回退下钻样本
-GET {{baseUrl}}/api/anomaly-samples?runId=run_candidate_v24&scenarioKey=occlusion&metricKey=collision_rate&page=1&pageSize=20
+### 未完成的任务可取消；已完成返回 409
+POST {{baseUrl}}/api/evaluation-runs/{{runId}}/cancel
 Cookie: {{sessionCookie}}
+Origin: http://localhost:3000
 
-### 6. 指派样本（示例版本号应先从详情读取）
-PATCH {{baseUrl}}/api/anomaly-samples/sample_017/assignment
+### 另建 mockFailure=true 的任务，同步至 FAILED 后才能重试
+POST {{baseUrl}}/api/evaluation-runs/{{runId}}/retry
 Cookie: {{sessionCookie}}
-Content-Type: application/json
-
-{ "assigneeId": "user_reviewer", "expectedVersion": 2 }
-
-### 7. REVIEWER 解决数据问题并在同一事务建回补任务
-POST {{baseUrl}}/api/anomaly-samples/sample_017/review
-Cookie: {{sessionCookie}}
-Content-Type: application/json
-
-{
-  "category": "DATA_ISSUE",
-  "conclusion": "遮挡场景抓取点标注偏移，需要回补",
-  "labels": ["occlusion", "annotation"],
-  "resolve": true,
-  "createBackfillTask": true,
-  "expectedVersion": 3
-}
-
-### 8. 独立创建回补任务（仅未在复核操作中创建时使用）
-POST {{baseUrl}}/api/backfill-tasks
-Cookie: {{sessionCookie}}
-Content-Type: application/json
-Idempotency-Key: backfill-sample-017
-
-{
-  "anomalySampleId": "sample_017",
-  "reason": "修正遮挡场景抓取点标注",
-  "assigneeId": "user_reviewer"
-}
-
-### 9. 生成报告草稿
-POST {{baseUrl}}/api/ai-reports
-Cookie: {{sessionCookie}}
-Content-Type: application/json
-Idempotency-Key: report-run-v24-001
-
-{ "runId": "run_candidate_v24", "baselineRunId": "run_baseline_v23" }
-
-### 10. REVIEWER/ADMIN 确认已校验证据的 READY 报告
-POST {{baseUrl}}/api/ai-reports/report_v24_001/confirm
-Cookie: {{sessionCookie}}
-
-# 代表性错误响应（示例，不是可执行请求）：
-# HTTP/1.1 409 Conflict
-# {"error":{"code":"VERSION_CONFLICT","message":"样本已被其他人更新，请刷新后重试","fieldErrors":null,"requestId":"req_review_017"}}
-# HTTP/1.1 422 Unprocessable Entity
-# {"error":{"code":"QUALITY_WARNING_NOT_ACCEPTED","message":"请先确认数据集质量警告","fieldErrors":{"acceptQualityWarning":["必须显式确认"]},"requestId":"req_create_001"}}
+Origin: http://localhost:3000
+Idempotency-Key: interview-retry-001
 ```
 
-### 可选维护操作：重新打开已解决样本
+### 代表性成功响应
 
-重开不在几分钟的主演示中；它用于解释状态机、并发和审计。以下仍是设计稿请求，不可对当前原型执行。
+质量报告的 dataset 为 `warehouse-scenes v3`、sampleCount 2400、qualityStatus WARNING；检查含 name 和 message，遮挡场景分布 affectedCount 18。18 是质量统计，2 是每个完成任务实际保存的异常数。
 
-```http
-POST {{baseUrl}}/api/anomaly-samples/sample_017/reopen
-Cookie: {{sessionCookie}}
-Content-Type: application/json
-
-{ "reason": "发现新的标注证据，需要重新复核", "expectedVersion": 4 }
-```
-
-成功返回 200，当前结论清空，历史仍可追溯：
+创建／详情／取消／重试返回完整 Run：ID、名称、配置 ID、状态、时间、Provider、基线／重试来源、错误、异常数，以及模型／数据集／Benchmark 展示名称、创建者和固定任务标记。完整字段见 OpenAPI 的 Run；创建时 startedAt／finishedAt／errorCode／errorMessage 均为 null、anomalyCount 为 0。
 
 ```json
 {
   "data": {
-    "id": "sample_017", "runId": "run_candidate_v24", "sampleNumber": 17,
-    "scenarioKey": "occlusion", "anomalyType": "collision", "metricKey": "collision_rate",
-    "status": "REOPENED", "reviewCategory": null, "assigneeId": "user_reviewer",
-    "conclusion": null, "resolvedAt": null, "mediaPath": null, "logExcerpt": "synthetic episode 17", "version": 5,
-    "reviewHistory": [
-      { "reviewerId": "user_reviewer", "fromStatus": "IN_REVIEW", "toStatus": "RESOLVED",
-        "category": "DATA_ISSUE", "conclusion": "遮挡场景抓取点标注偏移，需要回补",
-        "reopenReason": null, "createdAt": "2026-09-23T10:04:00Z" },
-      { "reviewerId": "user_reviewer", "fromStatus": "RESOLVED", "toStatus": "REOPENED",
-        "category": null, "conclusion": null, "reopenReason": "发现新的标注证据，需要重新复核",
-        "createdAt": "2026-09-23T10:05:00Z" }
-    ]
+    "runId": "CREATED_RUN_ID",
+    "status": "RUNNING",
+    "progress": null,
+    "startedAt": "2026-09-26T10:00:02Z",
+    "finishedAt": null,
+    "pollAfterMs": 1500
   },
-  "meta": { "requestId": "req_reopen_017" }
+  "meta": { "requestId": "EXAMPLE_REQUEST_UUID" }
 }
 ```
 
-若样本已经是 `REOPENED`，返回 409：
-
-```json
-{ "error": { "code": "STATE_CONFLICT", "message": "只有已解决样本可以重新打开", "fieldErrors": null, "requestId": "req_reopen_018" } }
-```
-
-原因仅为空白时返回 422 `VALIDATION_ERROR`，`fieldErrors.reason` 指向该字段；无权限返回 403 `FORBIDDEN`，版本不符返回 409 `VERSION_CONFLICT`。
-
-## 9. 代表性响应示例
-
-以下 ID、数值和文本都是固定的合成演示故事。具体数值在 Seed 与 Provider 实现时锁定；本页用于审阅返回结构，不证明系统已运行。
-
-### 质量报告：200
-
-```json
-{
-  "data": {
-    "dataset": { "id": "dataset_warehouse_v3", "name": "warehouse-scenes", "version": "v3", "sampleCount": 12000, "qualityStatus": "WARNING" },
-    "checks": [
-      { "key": "invalid_annotations", "status": "WARNING", "affectedCount": 18, "message": "18 个遮挡场景样本需要复核" }
-    ],
-    "canStartEvaluation": true
-  },
-  "meta": { "requestId": "req_quality_001" }
-}
-```
-
-### 创建评测：201；相同幂等请求重放：200
-
-```json
-{
-  "data": {
-    "id": "run_candidate_v24", "projectId": "project_warehouse", "name": "v2.4 仓储抓取评测", "status": "QUEUED",
-    "modelVersionId": "model_v24", "datasetVersionId": "dataset_warehouse_v3",
-    "benchmarkId": "benchmark_warehouse_pick", "baselineRunId": "run_baseline_v23",
-    "retryOfRunId": null, "episodeCount": 200, "simulationSeed": 20260901,
-    "provider": "mock", "createdAt": "2026-09-23T10:00:00Z", "startedAt": null,
-    "finishedAt": null, "errorCode": null, "errorMessage": null
-  },
-  "meta": { "requestId": "req_create_001" }
-}
-```
-
-### 模拟状态同步：200
-
-```json
-{
-  "data": {
-    "runId": "run_candidate_v24", "status": "SUCCEEDED", "progress": 1,
-    "startedAt": "2026-09-23T10:00:02Z", "finishedAt": "2026-09-23T10:00:12Z",
-    "pollAfterMs": 0
-  },
-  "meta": { "requestId": "req_sync_001" }
-}
-```
-
-### 模型对比：200
-
-```json
-{
-  "data": {
-    "baselineRunId": "run_baseline_v23", "candidateRunId": "run_candidate_v24",
-    "metrics": [
-      {
-        "metricKey": "collision_rate", "scenarioKey": "occlusion", "unit": "%",
-        "direction": "LOWER_IS_BETTER", "baselineValue": 8, "candidateValue": 13,
-        "delta": 5, "verdict": "REGRESSION", "evidenceCount": 2
-      }
-    ]
-  },
-  "meta": { "requestId": "req_compare_001" }
-}
-```
-
-`delta` 始终为候选值减基线值；改善或回退由 `direction` 和差值共同判定。此处碰撞率越低越好，故 `+5` 是回退。
-
-### 数据问题复核并创建回补：200
-
-```json
-{
-  "data": {
-    "sample": {
-      "id": "sample_017", "runId": "run_candidate_v24", "sampleNumber": 17,
-      "scenarioKey": "occlusion", "anomalyType": "collision", "metricKey": "collision_rate", "status": "RESOLVED",
-      "reviewCategory": "DATA_ISSUE", "assigneeId": "user_reviewer",
-      "conclusion": "遮挡场景抓取点标注偏移，需要回补", "mediaPath": null,
-      "logExcerpt": "synthetic episode 17", "version": 4
-    },
-    "backfillTask": {
-      "id": "backfill_017", "anomalySampleId": "sample_017",
-      "reason": "遮挡场景抓取点标注偏移", "status": "OPEN",
-      "assigneeId": "user_reviewer", "resolutionNote": null
-    }
-  },
-  "meta": { "requestId": "req_review_017" }
-}
-```
-
-### 报告草稿：201
-
-```json
-{
-  "data": {
-    "id": "report_v24_001", "runId": "run_candidate_v24",
-    "baselineRunId": "run_baseline_v23", "status": "READY",
-    "summary": "总体成功率提高，但遮挡场景碰撞率回退；需区分模型与数据原因。AI 草稿，尚未人工确认。",
-    "findings": [
-      { "category": "DATA_ISSUE", "summary": "遮挡场景标注偏移", "evidenceSampleIds": ["sample_017"] },
-      { "category": "MODEL_ISSUE", "summary": "接近路径过窄", "evidenceSampleIds": ["sample_018"] }
-    ],
-    "evidenceSampleIds": ["sample_017", "sample_018"],
-    "provider": "cached", "confirmedById": null, "confirmedAt": null
-  },
-  "meta": { "requestId": "req_report_001" }
-}
-```
-
-### 版本冲突：409
+### 代表性错误响应
 
 ```json
 {
   "error": {
-    "code": "VERSION_CONFLICT", "message": "样本已被其他人更新，请刷新后重试",
-    "fieldErrors": null, "requestId": "req_review_017"
+    "code": "QUALITY_WARNING_NOT_ACCEPTED",
+    "message": "请先确认数据集质量警告",
+    "fieldErrors": { "acceptQualityWarning": ["必须明确接受质量警告"] },
+    "requestId": "EXAMPLE_REQUEST_UUID"
   }
 }
 ```
 
-### 质量警告未接受：422
+| HTTP | code | 含义 |
+|---|---|---|
+| 401 | UNAUTHENTICATED | 会话无效 |
+| 403 | FORBIDDEN | 角色、任务归属或 Origin 不满足 |
+| 404 | NOT_FOUND | 对象不存在 |
+| 409 | IDEMPOTENCY_CONFLICT／STATE_CONFLICT | 重复键内容不同或状态不允许 |
+| 422 | VALIDATION_ERROR | 结构、路径、分页、字段或请求头不合法 |
+| 422 | QUALITY_WARNING_NOT_ACCEPTED／DATASET_QUALITY_BLOCKED | 未确认警告或质量阻断 |
+| 422 | INCOMPATIBLE_CONFIGURATION | 非同项目、非同口径或基线缺结果 |
+| 503 | EXTERNAL_SERVICE_ERROR | 完成时基线结果不可用，本次事务回滚 |
+| 500 | INTERNAL_ERROR | 未预期错误 |
 
-```json
-{
-  "error": {
-    "code": "QUALITY_WARNING_NOT_ACCEPTED", "message": "请先确认数据集质量警告",
-    "fieldErrors": { "acceptQualityWarning": ["必须显式确认"] },
-    "requestId": "req_create_002"
-  }
-}
-```
+## 5. 新原型的计划示例
+
+以下不是当前可调用请求。目标创建使用 TargetCreateRunRequest，可省略 baselineRunId，增加可选 successRateThreshold（0.8／0.85）；目录返回可选版本、兼容关系和范围。选择必须影响执行，不能只改显示名称。
+
+~~~http
+### 编辑或确认结论；mode=confirm 仅评测人员
+PATCH {{baseUrl}}/api/anomaly-samples/{{sampleId}}/review
+Origin: http://localhost:3000
+Content-Type: application/json
+
+{"conclusion":"证据显示抓取路径在遮挡区域碰撞，建议调整后复测。","mode":"confirm","expectedVersion":2}
+
+### 删除本人已结束任务：软删除，保留证据引用
+DELETE {{baseUrl}}/api/evaluation-runs/{{runId}}
+Origin: http://localhost:3000
+~~~
+
+结论不要求分类。保存草稿不覆盖已确认内容；确认／修改追加历史与审计，版本冲突返回 409 并保留输入。最终结论内容变化令旧报告过时；草稿变动不会让已确认报告失效。
+
+报告可无基线，服务端组装指标／证据／确认版本快照；AI 只输出草稿。确认时重新核对来源版本，过时报告不能确认或当作最新。错误复用公共结构；后续 Provider 超时、缓存和降级策略在报告切片定稿。
+
+## 6. 变更记录
+
+| 日期 | 版本 | 变更 |
+|---|---|---|
+| 2026-09-23 | 0.1–0.2 draft | 初始契约、只读状态／同步拆分与重开草案 |
+| 2026-09-26 | 0.3.0 | 八个质量／评测操作实现，补齐 DTO、Origin、幂等和错误 |
+| 2026-09-27 | 0.4.0 文档 | 保留实际八项；新目标与 planned 分开，移除回补，新增目录／软删除，结论编辑与报告版本修订；未改运行接口 |

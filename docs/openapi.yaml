@@ -1,617 +1,1718 @@
-# 业务 HTTP 契约草案：描述计划中的接口，不代表当前阶段已实现。
-openapi: 3.1.0
+openapi: "3.1.0"
 info:
-  title: SimEval HTTP API
-  version: 0.2.0-draft
-  description: |
-    编码前契约草案；所有业务数据与评测执行均为明确标注的合成/模拟数据。
-    本文件描述计划接口，不表示接口已经实现。角色要求见各操作的 x-roles。
-    异常样本重开采用独立操作；所有写入仍须由服务端校验身份、角色、参数和状态。
-jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+  title: "SimEval HTTP API"
+  version: "0.4.0"
+  description: "合成数据与模拟执行。implemented 表示当前第一版可调用契约；planned 为未实现计划。\nx-target-* 标出已有接口的新原型目标，尚未改变实际请求或角色权限。\n2026-09-27 按双身份、自主配置、多任务、软删除、结论编辑和报告版本修订；未修改运行代码。\n"
+jsonSchemaDialect: "https://json-schema.org/draft/2020-12/schema"
 tags:
-  - { name: DataQuality, description: 数据集质量 }
-  - { name: Evaluation, description: 评测任务 }
-  - { name: Comparison, description: 模型对比 }
-  - { name: Anomaly, description: 异常样本与复核 }
-  - { name: Backfill, description: 轻量回补任务 }
-  - { name: Report, description: AI 报告与人工确认 }
+  -
+    name: "Catalog"
+    description: "评测配置目录与兼容性"
+  -
+    name: "DataQuality"
+    description: "数据集质量"
+  -
+    name: "Evaluation"
+    description: "评测任务"
+  -
+    name: "Comparison"
+    description: "模型对比"
+  -
+    name: "Anomaly"
+    description: "异常样本与复核"
+  -
+    name: "Report"
+    description: "AI 报告与人工确认"
 security:
-  - sessionCookie: []
+  -
+    sessionCookie: []
 paths:
-  /api/datasets/{datasetId}/quality:
+  "/api/datasets/{datasetId}/quality":
     get:
-      tags: [DataQuality]
-      operationId: getDatasetQuality
-      summary: 获取数据集质量摘要与检查项
-      x-roles: [ENGINEER, REVIEWER, ADMIN]
+      tags:
+        - "DataQuality"
+      operationId: "getDatasetQuality"
+      x-implementation-status: "implemented"
+      summary: "获取数据集质量摘要与检查项"
+      x-roles:
+        - "ENGINEER"
+        - "REVIEWER"
+        - "ADMIN"
       parameters:
-        - $ref: '#/components/parameters/DatasetId'
+        -
+          $ref: "#/components/parameters/DatasetId"
       responses:
-        '200': { description: 质量报告, content: { application/json: { schema: { $ref: '#/components/schemas/QualityEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-  /api/evaluation-runs:
+        200:
+          description: "质量报告"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/QualityEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        422:
+          $ref: "#/components/responses/Unprocessable"
+        500:
+          $ref: "#/components/responses/InternalError"
+      x-target-roles:
+        - "ENGINEER"
+        - "REVIEWER"
+  "/api/evaluation-runs":
     get:
-      tags: [Evaluation]
-      operationId: listEvaluationRuns
-      summary: 按创建时间倒序查询评测任务
-      x-roles: [ENGINEER, REVIEWER, ADMIN]
+      tags:
+        - "Evaluation"
+      operationId: "listEvaluationRuns"
+      x-implementation-status: "implemented"
+      summary: "按创建时间倒序查询评测任务"
+      x-roles:
+        - "ENGINEER"
+        - "REVIEWER"
+        - "ADMIN"
       parameters:
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PageSize'
-        - { name: status, in: query, schema: { $ref: '#/components/schemas/RunStatus' } }
-        - { name: projectId, in: query, schema: { type: string } }
+        -
+          $ref: "#/components/parameters/Page"
+        -
+          $ref: "#/components/parameters/PageSize"
+        -
+          name: "status"
+          in: "query"
+          schema:
+            $ref: "#/components/schemas/RunStatus"
+        -
+          name: "projectId"
+          in: "query"
+          schema:
+            $ref: "#/components/schemas/ResourceId"
       responses:
-        '200': { description: 任务列表, content: { application/json: { schema: { $ref: '#/components/schemas/RunListEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '422': { $ref: '#/components/responses/Unprocessable' }
+        200:
+          description: "任务列表"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/RunListEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        422:
+          $ref: "#/components/responses/Unprocessable"
+        500:
+          $ref: "#/components/responses/InternalError"
+      x-target-roles:
+        - "ENGINEER"
+        - "REVIEWER"
+      x-target-changes: "过滤软删除，区分示例与新建任务，支持显式选择而非恢复最近任务。"
     post:
-      tags: [Evaluation]
-      operationId: createEvaluationRun
-      summary: 创建模拟评测任务
-      x-roles: [ENGINEER, ADMIN]
+      tags:
+        - "Evaluation"
+      operationId: "createEvaluationRun"
+      x-implementation-status: "implemented"
+      summary: "创建模拟评测任务"
+      x-roles:
+        - "ENGINEER"
+        - "ADMIN"
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
+        -
+          $ref: "#/components/parameters/IdempotencyKey"
       requestBody:
         required: true
         content:
-          application/json:
-            schema: { $ref: '#/components/schemas/CreateRunRequest' }
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/CreateRunRequest"
       responses:
-        '201': { description: 已创建 QUEUED 任务, content: { application/json: { schema: { $ref: '#/components/schemas/RunEnvelope' } } } }
-        '200': { description: 相同幂等请求返回已有任务, content: { application/json: { schema: { $ref: '#/components/schemas/RunEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/Unprocessable' }
-        '503': { $ref: '#/components/responses/ExternalServiceError' }
-  /api/evaluation-runs/{runId}:
+        200:
+          description: "相同幂等请求返回已有任务"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/RunEnvelope"
+        201:
+          description: "已创建 QUEUED 任务"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/RunEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        409:
+          $ref: "#/components/responses/Conflict"
+        422:
+          $ref: "#/components/responses/Unprocessable"
+        500:
+          $ref: "#/components/responses/InternalError"
+        503:
+          $ref: "#/components/responses/ExternalServiceError"
+      x-target-roles:
+        - "ENGINEER"
+      x-target-request-schema: "#/components/schemas/TargetCreateRunRequest"
+      x-target-changes: "基线可选，目录兼容校验，成功率目标与配置快照；改造完成后更新实际契约。"
+  "/api/evaluation-runs/{runId}":
     get:
-      tags: [Evaluation]
-      operationId: getEvaluationRun
-      summary: 获取任务详情、配置与结果摘要
-      x-roles: [ENGINEER, REVIEWER, ADMIN]
+      tags:
+        - "Evaluation"
+      operationId: "getEvaluationRun"
+      x-implementation-status: "implemented"
+      summary: "获取任务详情、配置与结果摘要"
+      x-roles:
+        - "ENGINEER"
+        - "REVIEWER"
+        - "ADMIN"
       parameters:
-        - $ref: '#/components/parameters/RunId'
+        -
+          $ref: "#/components/parameters/RunId"
       responses:
-        '200': { description: 任务详情, content: { application/json: { schema: { $ref: '#/components/schemas/RunEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-  /api/evaluation-runs/{runId}/status:
+        200:
+          description: "任务详情"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/RunEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        422:
+          $ref: "#/components/responses/Unprocessable"
+        500:
+          $ref: "#/components/responses/InternalError"
+      x-target-roles:
+        - "ENGINEER"
+        - "REVIEWER"
+    delete:
+      tags:
+        - "Evaluation"
+      operationId: "deleteEvaluationRun"
+      x-implementation-status: "planned"
+      x-roles:
+        - "ENGINEER"
+      summary: "软删除本人已结束任务"
+      description: "仅本人 SUCCEEDED／FAILED／CANCELLED，固定示例保护；进行中先取消。保留证据、基线和审计引用；普通列表过滤，重复删除 200。服务端校验会话／Origin／状态并记录审计。"
+      parameters:
+        -
+          $ref: "#/components/parameters/RunId"
+      responses:
+        200:
+          description: "成功"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/DeleteRunEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        409:
+          $ref: "#/components/responses/Conflict"
+        422:
+          $ref: "#/components/responses/Unprocessable"
+        500:
+          $ref: "#/components/responses/InternalError"
+  "/api/evaluation-runs/{runId}/status":
     get:
-      tags: [Evaluation]
-      operationId: getEvaluationRunStatus
-      summary: 只读获取已保存的任务状态
-      x-roles: [ENGINEER, REVIEWER, ADMIN]
+      tags:
+        - "Evaluation"
+      operationId: "getEvaluationRunStatus"
+      x-implementation-status: "implemented"
+      summary: "只读获取已保存的任务状态"
+      x-roles:
+        - "ENGINEER"
+        - "REVIEWER"
+        - "ADMIN"
       parameters:
-        - $ref: '#/components/parameters/RunId'
+        -
+          $ref: "#/components/parameters/RunId"
       responses:
-        '200': { description: 当前状态与建议轮询间隔, content: { application/json: { schema: { $ref: '#/components/schemas/RunStatusEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-  /api/evaluation-runs/{runId}/sync:
+        200:
+          description: "当前状态与建议轮询间隔"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/RunStatusEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        422:
+          $ref: "#/components/responses/Unprocessable"
+        500:
+          $ref: "#/components/responses/InternalError"
+      x-target-roles:
+        - "ENGINEER"
+        - "REVIEWER"
+  "/api/evaluation-runs/{runId}/sync":
     post:
-      tags: [Evaluation]
-      operationId: syncEvaluationRun
-      summary: 根据服务器时间推进模拟任务，到期后事务性写入一次结果
-      x-roles: [ENGINEER, REVIEWER, ADMIN]
-      description: 可重复调用；并发请求最终只产生一组指标与异常样本。无需客户端随机数或定时写入。
+      tags:
+        - "Evaluation"
+      operationId: "syncEvaluationRun"
+      x-implementation-status: "implemented"
+      summary: "根据服务器时间推进模拟任务，到期后事务性写入一次结果"
+      x-roles:
+        - "ENGINEER"
+        - "REVIEWER"
+        - "ADMIN"
+      description: "每次最多推进一段；满 2 秒排队转运行，满 12 秒运行转终态。无后台执行。并发只生成一组结果；所有 POST 须同源 Origin。"
       parameters:
-        - $ref: '#/components/parameters/RunId'
+        -
+          $ref: "#/components/parameters/RunId"
       responses:
-        '200': { description: 当前状态与建议轮询间隔, content: { application/json: { schema: { $ref: '#/components/schemas/RunStatusEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-  /api/evaluation-runs/{runId}/cancel:
+        200:
+          description: "当前状态与建议轮询间隔"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/RunStatusEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        422:
+          $ref: "#/components/responses/Unprocessable"
+        500:
+          $ref: "#/components/responses/InternalError"
+        503:
+          $ref: "#/components/responses/ExternalServiceError"
+      x-target-roles:
+        - "ENGINEER"
+        - "REVIEWER"
+  "/api/evaluation-runs/{runId}/cancel":
     post:
-      tags: [Evaluation]
-      operationId: cancelEvaluationRun
-      summary: 取消尚未进入终态的任务
-      x-roles: [ENGINEER, ADMIN]
+      tags:
+        - "Evaluation"
+      operationId: "cancelEvaluationRun"
+      x-implementation-status: "implemented"
+      summary: "取消尚未进入终态的任务"
+      x-roles:
+        - "ENGINEER"
+        - "ADMIN"
       parameters:
-        - $ref: '#/components/parameters/RunId'
+        -
+          $ref: "#/components/parameters/RunId"
       responses:
-        '200': { description: 取消后的任务, content: { application/json: { schema: { $ref: '#/components/schemas/RunEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-  /api/evaluation-runs/{runId}/retry:
+        200:
+          description: "取消后的任务"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/RunEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        409:
+          $ref: "#/components/responses/Conflict"
+        422:
+          $ref: "#/components/responses/Unprocessable"
+        500:
+          $ref: "#/components/responses/InternalError"
+      x-target-roles:
+        - "ENGINEER"
+  "/api/evaluation-runs/{runId}/retry":
     post:
-      tags: [Evaluation]
-      operationId: retryEvaluationRun
-      summary: 为失败任务创建新任务，原任务不覆盖
-      x-roles: [ENGINEER, ADMIN]
+      tags:
+        - "Evaluation"
+      operationId: "retryEvaluationRun"
+      x-implementation-status: "implemented"
+      summary: "为失败任务创建新任务，原任务不覆盖"
+      x-roles:
+        - "ENGINEER"
+        - "ADMIN"
       parameters:
-        - $ref: '#/components/parameters/RunId'
-        - $ref: '#/components/parameters/IdempotencyKey'
+        -
+          $ref: "#/components/parameters/RunId"
+        -
+          $ref: "#/components/parameters/IdempotencyKey"
       responses:
-        '201': { description: 新的 QUEUED 任务, content: { application/json: { schema: { $ref: '#/components/schemas/RunEnvelope' } } } }
-        '200': { description: 相同幂等请求返回已有重试任务, content: { application/json: { schema: { $ref: '#/components/schemas/RunEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '503': { $ref: '#/components/responses/ExternalServiceError' }
-  /api/comparisons:
+        200:
+          description: "相同幂等请求返回已有重试任务"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/RunEnvelope"
+        201:
+          description: "新的 QUEUED 任务"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/RunEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        409:
+          $ref: "#/components/responses/Conflict"
+        422:
+          $ref: "#/components/responses/Unprocessable"
+        500:
+          $ref: "#/components/responses/InternalError"
+        503:
+          $ref: "#/components/responses/ExternalServiceError"
+      x-target-roles:
+        - "ENGINEER"
+  "/api/comparisons":
     get:
-      tags: [Comparison]
-      operationId: compareEvaluationRuns
-      summary: 比较两个已成功任务的同口径指标
-      x-roles: [ENGINEER, REVIEWER, ADMIN]
+      tags:
+        - "Comparison"
+      operationId: "compareEvaluationRuns"
+      x-implementation-status: "planned"
+      summary: "比较两个已成功任务的同口径指标"
+      x-roles:
+        - "ENGINEER"
       parameters:
-        - { name: baselineRunId, in: query, required: true, schema: { type: string } }
-        - { name: candidateRunId, in: query, required: true, schema: { type: string } }
-        - { name: scenarioKey, in: query, schema: { type: string } }
+        -
+          name: "baselineRunId"
+          in: "query"
+          required: true
+          schema:
+            type: "string"
+        -
+          name: "candidateRunId"
+          in: "query"
+          required: true
+          schema:
+            type: "string"
+        -
+          name: "scenarioKey"
+          in: "query"
+          schema:
+            type: "string"
       responses:
-        '200': { description: 指标差值与证据计数, content: { application/json: { schema: { $ref: '#/components/schemas/ComparisonEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '422': { $ref: '#/components/responses/Unprocessable' }
-  /api/anomaly-samples:
+        200:
+          description: "指标差值与证据计数"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ComparisonEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        404:
+          $ref: "#/components/responses/NotFound"
+        422:
+          $ref: "#/components/responses/Unprocessable"
+  "/api/anomaly-samples":
     get:
-      tags: [Anomaly]
-      operationId: listAnomalySamples
-      summary: 筛选异常样本
-      x-roles: [ENGINEER, REVIEWER, ADMIN]
+      tags:
+        - "Anomaly"
+      operationId: "listAnomalySamples"
+      x-implementation-status: "planned"
+      summary: "筛选异常样本"
+      x-roles:
+        - "ENGINEER"
+        - "REVIEWER"
       parameters:
-        - $ref: '#/components/parameters/Page'
-        - $ref: '#/components/parameters/PageSize'
-        - { name: runId, in: query, schema: { type: string } }
-        - { name: scenarioKey, in: query, schema: { type: string } }
-        - { name: metricKey, in: query, description: 从对比页下钻时保留的指标筛选, schema: { type: string } }
-        - { name: category, in: query, schema: { $ref: '#/components/schemas/ReviewCategory' } }
-        - { name: status, in: query, schema: { $ref: '#/components/schemas/SampleStatus' } }
-        - { name: assigneeId, in: query, schema: { type: string } }
+        -
+          $ref: "#/components/parameters/Page"
+        -
+          $ref: "#/components/parameters/PageSize"
+        -
+          name: "runId"
+          in: "query"
+          schema:
+            $ref: "#/components/schemas/ResourceId"
+          required: true
+        -
+          name: "scenarioKey"
+          in: "query"
+          schema:
+            type: "string"
+        -
+          name: "metricKey"
+          in: "query"
+          description: "从对比页下钻时保留的指标筛选"
+          schema:
+            type: "string"
+        -
+          name: "status"
+          in: "query"
+          schema:
+            $ref: "#/components/schemas/SampleStatus"
+        -
+          name: "assigneeId"
+          in: "query"
+          schema:
+            type: "string"
       responses:
-        '200': { description: 样本列表, content: { application/json: { schema: { $ref: '#/components/schemas/SampleListEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '422': { $ref: '#/components/responses/Unprocessable' }
-  /api/anomaly-samples/{sampleId}:
+        200:
+          description: "样本列表"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/SampleListEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        422:
+          $ref: "#/components/responses/Unprocessable"
+      description: "必须明确 runId；列表属于选定成功任务，待复核注明需评测人员复核。"
+  "/api/anomaly-samples/{sampleId}":
     get:
-      tags: [Anomaly]
-      operationId: getAnomalySample
-      summary: 获取样本证据、当前复核与历史
-      x-roles: [ENGINEER, REVIEWER, ADMIN]
+      tags:
+        - "Anomaly"
+      operationId: "getAnomalySample"
+      x-implementation-status: "planned"
+      summary: "获取样本证据、当前复核与历史"
+      x-roles:
+        - "ENGINEER"
+        - "REVIEWER"
       parameters:
-        - $ref: '#/components/parameters/SampleId'
+        -
+          $ref: "#/components/parameters/SampleId"
       responses:
-        '200': { description: 样本详情, content: { application/json: { schema: { $ref: '#/components/schemas/SampleEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-  /api/anomaly-samples/{sampleId}/assignment:
+        200:
+          description: "样本详情"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/SampleEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        404:
+          $ref: "#/components/responses/NotFound"
+  "/api/anomaly-samples/{sampleId}/assignment":
     patch:
-      tags: [Anomaly]
-      operationId: assignAnomalySample
-      summary: 指派异常样本负责人
-      x-roles: [ENGINEER, REVIEWER, ADMIN]
+      tags:
+        - "Anomaly"
+      operationId: "assignAnomalySample"
+      x-implementation-status: "planned"
+      summary: "指派异常样本负责人"
+      x-roles:
+        - "ENGINEER"
+        - "REVIEWER"
       parameters:
-        - $ref: '#/components/parameters/SampleId'
+        -
+          $ref: "#/components/parameters/SampleId"
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/AssignmentRequest' } } }
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/AssignmentRequest"
       responses:
-        '200': { description: 更新后的样本, content: { application/json: { schema: { $ref: '#/components/schemas/SampleEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/Unprocessable' }
-  /api/anomaly-samples/{sampleId}/review:
-    post:
-      tags: [Anomaly]
-      operationId: reviewAnomalySample
-      summary: 保存复核或解决样本；必要时同事务创建回补任务
-      x-roles: [ENGINEER, REVIEWER, ADMIN]
-      description: resolve=true 仅 REVIEWER/ADMIN；解决需负责人、分类、人工结论。REOPENED 样本保存新草稿时进入 IN_REVIEW。
-      parameters:
-        - $ref: '#/components/parameters/SampleId'
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/ReviewRequest' } } }
-      responses:
-        '200': { description: 更新后的样本及可选回补任务, content: { application/json: { schema: { $ref: '#/components/schemas/ReviewEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/Unprocessable' }
-  /api/anomaly-samples/{sampleId}/reopen:
-    post:
-      tags: [Anomaly]
-      operationId: reopenAnomalySample
-      summary: 重新打开已解决的异常样本
-      x-roles: [REVIEWER, ADMIN]
-      description: 仅允许 RESOLVED → REOPENED；保留负责人和历史结论，清空当前分类、结论及解决时间。原因、状态变化和审计同事务记录。
-      parameters:
-        - $ref: '#/components/parameters/SampleId'
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/ReopenSampleRequest' } } }
-      responses:
-        '200': { description: 重开后的样本及复核历史, content: { application/json: { schema: { $ref: '#/components/schemas/SampleEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/Unprocessable' }
-  /api/backfill-tasks:
-    post:
-      tags: [Backfill]
-      operationId: createBackfillTask
-      summary: 为已归类的数据问题或无效样本创建回补任务
-      x-roles: [REVIEWER, ADMIN]
-      parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
-      requestBody:
-        required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/CreateBackfillRequest' } } }
-      responses:
-        '201': { description: 已创建的 OPEN 回补任务, content: { application/json: { schema: { $ref: '#/components/schemas/BackfillEnvelope' } } } }
-        '200': { description: 相同幂等请求返回已有回补任务, content: { application/json: { schema: { $ref: '#/components/schemas/BackfillEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/Unprocessable' }
-  /api/backfill-tasks/{taskId}:
+        200:
+          description: "更新后的样本"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/SampleEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        404:
+          $ref: "#/components/responses/NotFound"
+        409:
+          $ref: "#/components/responses/Conflict"
+        422:
+          $ref: "#/components/responses/Unprocessable"
+      x-design-status: "needs-detail"
+  "/api/anomaly-samples/{sampleId}/review":
     patch:
-      tags: [Backfill]
-      operationId: updateBackfillTask
-      summary: 更新回补状态、负责人和处理说明
-      x-roles: [REVIEWER, ADMIN]
+      tags:
+        - "Anomaly"
+      operationId: "reviewAnomalySample"
+      x-implementation-status: "planned"
+      summary: "保存草稿，或由评测人员确认／修改最终结论"
+      x-roles:
+        - "ENGINEER"
+        - "REVIEWER"
+      description: "mode=draft 两身份可用，不覆盖已确认结论；mode=confirm 仅 REVIEWER。expectedVersion 防覆盖，历史与审计一起保存；最终内容变化使旧报告过时。"
       parameters:
-        - $ref: '#/components/parameters/TaskId'
+        -
+          $ref: "#/components/parameters/SampleId"
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/UpdateBackfillRequest' } } }
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/ReviewRequest"
       responses:
-        '200': { description: 更新后的任务, content: { application/json: { schema: { $ref: '#/components/schemas/BackfillEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/Unprocessable' }
-  /api/ai-reports:
+        200:
+          description: "更新后的样本、草稿与确认版本"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ReviewEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        409:
+          $ref: "#/components/responses/Conflict"
+        422:
+          $ref: "#/components/responses/Unprocessable"
+  "/api/anomaly-samples/{sampleId}/reopen":
     post:
-      tags: [Report]
-      operationId: createAiReport
-      summary: 同步生成并校验证据化 AI 报告草稿
-      x-roles: [ENGINEER, REVIEWER, ADMIN]
+      tags:
+        - "Anomaly"
+      operationId: "reopenAnomalySample"
+      x-implementation-status: "planned"
+      summary: "重新打开已解决的异常样本"
+      x-roles:
+        - "REVIEWER"
+      description: "后续切片细化；仅 REVIEWER，保留已确认内容与历史，不属于当前演示主线。若撤销当前确认，相关报告必须标记过时。"
       parameters:
-        - $ref: '#/components/parameters/IdempotencyKey'
+        -
+          $ref: "#/components/parameters/SampleId"
       requestBody:
         required: true
-        content: { application/json: { schema: { $ref: '#/components/schemas/CreateReportRequest' } } }
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/ReopenSampleRequest"
       responses:
-        '201': { description: 已保存 READY 草稿, content: { application/json: { schema: { $ref: '#/components/schemas/ReportEnvelope' } } } }
-        '200': { description: 相同幂等请求返回已有报告, content: { application/json: { schema: { $ref: '#/components/schemas/ReportEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/Unprocessable' }
-        '503': { $ref: '#/components/responses/ExternalServiceError' }
-  /api/ai-reports/{reportId}:
+        200:
+          description: "重开后的样本及复核历史"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/SampleEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        409:
+          $ref: "#/components/responses/Conflict"
+        422:
+          $ref: "#/components/responses/Unprocessable"
+      x-design-status: "needs-detail"
+  "/api/ai-reports":
+    post:
+      tags:
+        - "Report"
+      operationId: "createAiReport"
+      x-implementation-status: "planned"
+      summary: "同步生成并校验证据化 AI 报告草稿"
+      x-roles:
+        - "ENGINEER"
+        - "REVIEWER"
+      parameters:
+        -
+          $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/CreateReportRequest"
+      responses:
+        200:
+          description: "相同幂等请求返回已有报告"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ReportEnvelope"
+        201:
+          description: "已保存 READY 草稿"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ReportEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        409:
+          $ref: "#/components/responses/Conflict"
+        422:
+          $ref: "#/components/responses/Unprocessable"
+        503:
+          $ref: "#/components/responses/ExternalServiceError"
+      description: "服务端组装选定任务的指标、样本证据与确认版本，可无基线；验证结构／引用后存草稿。网络请求不在数据库事务内，缓存／降级标明来源。"
+  "/api/ai-reports/{reportId}":
     get:
-      tags: [Report]
-      operationId: getAiReport
-      summary: 获取报告及引用的指标与样本编号
-      x-roles: [ENGINEER, REVIEWER, ADMIN]
+      tags:
+        - "Report"
+      operationId: "getAiReport"
+      x-implementation-status: "planned"
+      summary: "获取报告及引用的指标与样本编号"
+      x-roles:
+        - "ENGINEER"
+        - "REVIEWER"
       parameters:
-        - $ref: '#/components/parameters/ReportId'
+        -
+          $ref: "#/components/parameters/ReportId"
       responses:
-        '200': { description: 报告详情, content: { application/json: { schema: { $ref: '#/components/schemas/ReportEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '404': { $ref: '#/components/responses/NotFound' }
-  /api/ai-reports/{reportId}/confirm:
+        200:
+          description: "报告详情"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ReportEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        404:
+          $ref: "#/components/responses/NotFound"
+  "/api/ai-reports/{reportId}/confirm":
     post:
-      tags: [Report]
-      operationId: confirmAiReport
-      summary: 人工确认 READY 报告
-      x-roles: [REVIEWER, ADMIN]
+      tags:
+        - "Report"
+      operationId: "confirmAiReport"
+      x-implementation-status: "planned"
+      summary: "人工确认 READY 报告"
+      x-roles:
+        - "REVIEWER"
       parameters:
-        - $ref: '#/components/parameters/ReportId'
+        -
+          $ref: "#/components/parameters/ReportId"
       responses:
-        '200': { description: 已确认报告, content: { application/json: { schema: { $ref: '#/components/schemas/ReportEnvelope' } } } }
-        '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { $ref: '#/components/responses/Forbidden' }
-        '404': { $ref: '#/components/responses/NotFound' }
-        '409': { $ref: '#/components/responses/Conflict' }
-        '422': { $ref: '#/components/responses/Unprocessable' }
+        200:
+          description: "已确认报告"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/ReportEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        409:
+          $ref: "#/components/responses/Conflict"
+        422:
+          $ref: "#/components/responses/Unprocessable"
+      description: "仅 REVIEWER；READY 且来源版本仍有效才可确认，过时或并发变更返回 409，保留历史。"
+  "/api/evaluation-catalog":
+    get:
+      tags:
+        - "Catalog"
+      operationId: "getEvaluationCatalog"
+      x-implementation-status: "planned"
+      x-roles:
+        - "ENGINEER"
+      summary: "读取可选版本、质量与兼容范围"
+      parameters:
+        -
+          name: "projectId"
+          in: "query"
+          required: true
+          schema:
+            $ref: "#/components/schemas/ResourceId"
+      responses:
+        200:
+          description: "成功"
+          content:
+            "application/json":
+              schema:
+                $ref: "#/components/schemas/EvaluationCatalogEnvelope"
+        401:
+          $ref: "#/components/responses/Unauthorized"
+        403:
+          $ref: "#/components/responses/Forbidden"
+        404:
+          $ref: "#/components/responses/NotFound"
+        409:
+          $ref: "#/components/responses/Conflict"
+        422:
+          $ref: "#/components/responses/Unprocessable"
+        500:
+          $ref: "#/components/responses/InternalError"
 components:
   securitySchemes:
     sessionCookie:
-      type: apiKey
-      in: cookie
-      name: authjs.session-token
-      description: Auth.js Session Cookie；生产环境可能有 Secure 前缀，实际名称在阶段 2 固定。
+      type: "apiKey"
+      in: "cookie"
+      name: "authjs.session-token"
+      description: "Auth.js Session Cookie；生产环境可能有 Secure 前缀，开发为 authjs.session-token，HTTPS 由 Auth.js 使用 Secure 前缀。"
   parameters:
-    DatasetId: { name: datasetId, in: path, required: true, schema: { type: string } }
-    RunId: { name: runId, in: path, required: true, schema: { type: string } }
-    SampleId: { name: sampleId, in: path, required: true, schema: { type: string } }
-    TaskId: { name: taskId, in: path, required: true, schema: { type: string } }
-    ReportId: { name: reportId, in: path, required: true, schema: { type: string } }
-    Page: { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
-    PageSize: { name: pageSize, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
-    IdempotencyKey:
-      name: Idempotency-Key
-      in: header
+    DatasetId:
+      name: "datasetId"
+      in: "path"
       required: true
-      description: 同一操作者、同一键、同一请求返回同一资源；同键不同请求返回 409。
-      schema: { type: string, minLength: 1, maxLength: 128 }
+      schema:
+        $ref: "#/components/schemas/ResourceId"
+    RunId:
+      name: "runId"
+      in: "path"
+      required: true
+      schema:
+        $ref: "#/components/schemas/ResourceId"
+    SampleId:
+      name: "sampleId"
+      in: "path"
+      required: true
+      schema:
+        type: "string"
+    ReportId:
+      name: "reportId"
+      in: "path"
+      required: true
+      schema:
+        type: "string"
+    Page:
+      name: "page"
+      in: "query"
+      schema:
+        type: "integer"
+        minimum: 1
+        default: 1
+    PageSize:
+      name: "pageSize"
+      in: "query"
+      schema:
+        type: "integer"
+        minimum: 1
+        maximum: 100
+        default: 20
+    IdempotencyKey:
+      name: "Idempotency-Key"
+      in: "header"
+      required: true
+      description: "同一操作者、同一键、同一请求返回同一资源；同键不同请求返回 409。"
+      schema:
+        type: "string"
+        minLength: 1
+        maxLength: 128
   responses:
-    Unauthorized: { description: 未登录, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
-    Forbidden: { description: 角色无权限, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
-    NotFound: { description: 资源不存在, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
-    Conflict: { description: 状态、版本或幂等冲突, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
-    Unprocessable: { description: 参数或业务门禁不满足, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
-    ExternalServiceError: { description: Provider 暂不可用, content: { application/json: { schema: { $ref: '#/components/schemas/ErrorEnvelope' } } } }
+    InternalError:
+      description: "未预期错误，返回通用信息与请求号"
+      content:
+        "application/json":
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Unauthorized:
+      description: "未登录"
+      content:
+        "application/json":
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Forbidden:
+      description: "角色或任务归属无权限，或写入 Origin 不匹配"
+      content:
+        "application/json":
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    NotFound:
+      description: "资源不存在"
+      content:
+        "application/json":
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Conflict:
+      description: "状态、版本或幂等冲突"
+      content:
+        "application/json":
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    Unprocessable:
+      description: "参数或业务门禁不满足"
+      content:
+        "application/json":
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
+    ExternalServiceError:
+      description: "Provider 暂不可用"
+      content:
+        "application/json":
+          schema:
+            $ref: "#/components/schemas/ErrorEnvelope"
   schemas:
+    ResourceId:
+      type: "string"
+      minLength: 1
+      maxLength: 64
+      pattern: "^[a-zA-Z0-9_-]+$"
     RequestMeta:
-      type: object
-      required: [requestId]
+      type: "object"
+      required:
+        - "requestId"
       properties:
-        requestId: { type: string, example: req_123 }
+        requestId:
+          type: "string"
+          example: "req_123"
     PageMeta:
       allOf:
-        - { $ref: '#/components/schemas/RequestMeta' }
-        - type: object
-          required: [page, pageSize, total]
+        -
+          $ref: "#/components/schemas/RequestMeta"
+        -
+          type: "object"
+          required:
+            - "page"
+            - "pageSize"
+            - "total"
           properties:
-            page: { type: integer, minimum: 1 }
-            pageSize: { type: integer, minimum: 1 }
-            total: { type: integer, minimum: 0 }
+            page:
+              type: "integer"
+              minimum: 1
+            pageSize:
+              type: "integer"
+              minimum: 1
+            total:
+              type: "integer"
+              minimum: 0
     ErrorEnvelope:
-      type: object
-      required: [error]
+      type: "object"
+      required:
+        - "error"
       properties:
         error:
-          type: object
-          required: [code, message, requestId]
+          type: "object"
+          required:
+            - "code"
+            - "message"
+            - "requestId"
           properties:
-            code: { type: string, example: STATE_CONFLICT }
-            message: { type: string, example: 当前状态不能执行该操作 }
-            fieldErrors: { type: [object, 'null'], additionalProperties: { type: array, items: { type: string } } }
-            requestId: { type: string, example: req_123 }
-    QualityStatus: { type: string, enum: [PASSED, WARNING, FAILED] }
-    RunStatus: { type: string, enum: [QUEUED, RUNNING, SUCCEEDED, FAILED, CANCELLED] }
-    SampleStatus: { type: string, enum: [OPEN, IN_REVIEW, RESOLVED, REOPENED] }
-    ReviewCategory: { type: string, enum: [MODEL_ISSUE, DATA_ISSUE, INVALID_SAMPLE, FALSE_POSITIVE, UNKNOWN] }
-    BackfillStatus: { type: string, enum: [OPEN, PROCESSING, COMPLETED, FAILED] }
-    ReportStatus: { type: string, enum: [READY, FAILED, CONFIRMED] }
+            code:
+              type: "string"
+              example: "STATE_CONFLICT"
+            message:
+              type: "string"
+              example: "当前状态不能执行该操作"
+            fieldErrors:
+              type:
+                - "object"
+                - "null"
+              additionalProperties:
+                type: "array"
+                items:
+                  type: "string"
+            requestId:
+              type: "string"
+              example: "req_123"
+    QualityStatus:
+      type: "string"
+      enum:
+        - "PASSED"
+        - "WARNING"
+        - "FAILED"
+    RunStatus:
+      type: "string"
+      enum:
+        - "QUEUED"
+        - "RUNNING"
+        - "SUCCEEDED"
+        - "FAILED"
+        - "CANCELLED"
+    SampleStatus:
+      type: "string"
+      enum:
+        - "OPEN"
+        - "IN_REVIEW"
+        - "RESOLVED"
+        - "REOPENED"
+    ReportStatus:
+      type: "string"
+      enum:
+        - "READY"
+        - "FAILED"
+        - "CONFIRMED"
     QualityEnvelope:
-      type: object
-      required: [data, meta]
+      type: "object"
+      required:
+        - "data"
+        - "meta"
       properties:
         data:
-          type: object
-          required: [dataset, checks, canStartEvaluation]
+          type: "object"
+          required:
+            - "dataset"
+            - "checks"
+            - "canStartEvaluation"
           properties:
             dataset:
-              type: object
-              required: [id, name, version, sampleCount, qualityStatus]
+              type: "object"
+              required:
+                - "id"
+                - "name"
+                - "version"
+                - "sampleCount"
+                - "qualityStatus"
               properties:
-                id: { type: string }
-                name: { type: string }
-                version: { type: string }
-                sampleCount: { type: integer, minimum: 0 }
-                qualityStatus: { $ref: '#/components/schemas/QualityStatus' }
+                id:
+                  type: "string"
+                name:
+                  type: "string"
+                version:
+                  type: "string"
+                sampleCount:
+                  type: "integer"
+                  minimum: 0
+                qualityStatus:
+                  $ref: "#/components/schemas/QualityStatus"
             checks:
-              type: array
+              type: "array"
               items:
-                type: object
-                required: [key, status, affectedCount, message]
+                type: "object"
+                required:
+                  - "key"
+                  - "name"
+                  - "status"
+                  - "affectedCount"
+                  - "message"
                 properties:
-                  key: { type: string }
-                  status: { $ref: '#/components/schemas/QualityStatus' }
-                  affectedCount: { type: integer, minimum: 0 }
-                  message: { type: string }
-            canStartEvaluation: { type: boolean }
-        meta: { $ref: '#/components/schemas/RequestMeta' }
+                  key:
+                    type: "string"
+                  name:
+                    type: "string"
+                  status:
+                    $ref: "#/components/schemas/QualityStatus"
+                  affectedCount:
+                    type: "integer"
+                    minimum: 0
+                  message:
+                    type: "string"
+            canStartEvaluation:
+              type: "boolean"
+        meta:
+          $ref: "#/components/schemas/RequestMeta"
     CreateRunRequest:
-      type: object
+      type: "object"
       additionalProperties: false
-      required: [name, modelVersionId, datasetVersionId, benchmarkId, baselineRunId, episodeCount, simulationSeed, acceptQualityWarning]
+      required:
+        - "name"
+        - "modelVersionId"
+        - "datasetVersionId"
+        - "benchmarkId"
+        - "baselineRunId"
+        - "episodeCount"
+        - "simulationSeed"
+        - "acceptQualityWarning"
       properties:
-        name: { type: string, minLength: 1, maxLength: 120 }
-        modelVersionId: { type: string }
-        datasetVersionId: { type: string }
-        benchmarkId: { type: string }
-        baselineRunId: { type: string }
-        episodeCount: { type: integer, minimum: 1 }
-        simulationSeed: { type: integer }
-        acceptQualityWarning: { type: boolean }
+        name:
+          type: "string"
+          minLength: 1
+          maxLength: 120
+        modelVersionId:
+          $ref: "#/components/schemas/ResourceId"
+        datasetVersionId:
+          $ref: "#/components/schemas/ResourceId"
+        benchmarkId:
+          $ref: "#/components/schemas/ResourceId"
+        baselineRunId:
+          $ref: "#/components/schemas/ResourceId"
+        episodeCount:
+          type: "integer"
+          minimum: 1
+          maximum: 10000
+        simulationSeed:
+          type: "integer"
+          minimum: 0
+          maximum: 2147483647
+        acceptQualityWarning:
+          type: "boolean"
+        mockFailure:
+          type: "boolean"
+          default: false
+          description: "明确的故障演示，重试默认清除"
     Run:
-      type: object
-      required: [id, projectId, name, status, modelVersionId, datasetVersionId, benchmarkId, episodeCount, simulationSeed, createdAt]
+      type: "object"
+      required:
+        - "id"
+        - "projectId"
+        - "name"
+        - "status"
+        - "modelVersionId"
+        - "datasetVersionId"
+        - "benchmarkId"
+        - "baselineRunId"
+        - "retryOfRunId"
+        - "episodeCount"
+        - "simulationSeed"
+        - "provider"
+        - "createdAt"
+        - "startedAt"
+        - "finishedAt"
+        - "errorCode"
+        - "errorMessage"
+        - "anomalyCount"
+        - "modelName"
+        - "modelVersion"
+        - "datasetName"
+        - "datasetVersion"
+        - "benchmarkName"
+        - "benchmarkVersion"
+        - "createdById"
+        - "isDemoFixture"
       properties:
-        id: { type: string }
-        projectId: { type: string }
-        name: { type: string }
-        status: { $ref: '#/components/schemas/RunStatus' }
-        modelVersionId: { type: string }
-        datasetVersionId: { type: string }
-        benchmarkId: { type: string }
-        baselineRunId: { type: [string, 'null'] }
-        retryOfRunId: { type: [string, 'null'] }
-        episodeCount: { type: integer }
-        simulationSeed: { type: integer }
-        provider: { type: string, example: mock }
-        createdAt: { type: string, format: date-time }
-        startedAt: { type: [string, 'null'], format: date-time }
-        finishedAt: { type: [string, 'null'], format: date-time }
-        errorCode: { type: [string, 'null'] }
-        errorMessage: { type: [string, 'null'] }
-        anomalyCount: { type: integer, minimum: 0 }
-    RunEnvelope: { type: object, required: [data, meta], properties: { data: { $ref: '#/components/schemas/Run' }, meta: { $ref: '#/components/schemas/RequestMeta' } } }
-    RunListEnvelope: { type: object, required: [data, meta], properties: { data: { type: array, items: { $ref: '#/components/schemas/Run' } }, meta: { $ref: '#/components/schemas/PageMeta' } } }
+        id:
+          type: "string"
+        projectId:
+          type: "string"
+        name:
+          type: "string"
+        status:
+          $ref: "#/components/schemas/RunStatus"
+        modelVersionId:
+          type: "string"
+        datasetVersionId:
+          type: "string"
+        benchmarkId:
+          type: "string"
+        baselineRunId:
+          type:
+            - "string"
+            - "null"
+        retryOfRunId:
+          type:
+            - "string"
+            - "null"
+        episodeCount:
+          type: "integer"
+        simulationSeed:
+          type: "integer"
+        provider:
+          type: "string"
+          example: "MockEvaluationProvider"
+        createdAt:
+          type: "string"
+          format: "date-time"
+        startedAt:
+          type:
+            - "string"
+            - "null"
+          format: "date-time"
+        finishedAt:
+          type:
+            - "string"
+            - "null"
+          format: "date-time"
+        errorCode:
+          type:
+            - "string"
+            - "null"
+        errorMessage:
+          type:
+            - "string"
+            - "null"
+        anomalyCount:
+          type: "integer"
+          minimum: 0
+        modelName:
+          type: "string"
+        modelVersion:
+          type: "string"
+        datasetName:
+          type: "string"
+        datasetVersion:
+          type: "string"
+        benchmarkName:
+          type: "string"
+        benchmarkVersion:
+          type: "string"
+        createdById:
+          type: "string"
+        isDemoFixture:
+          type: "boolean"
+    RunEnvelope:
+      type: "object"
+      required:
+        - "data"
+        - "meta"
+      properties:
+        data:
+          $ref: "#/components/schemas/Run"
+        meta:
+          $ref: "#/components/schemas/RequestMeta"
+    RunListEnvelope:
+      type: "object"
+      required:
+        - "data"
+        - "meta"
+      properties:
+        data:
+          type: "array"
+          items:
+            $ref: "#/components/schemas/Run"
+        meta:
+          $ref: "#/components/schemas/PageMeta"
     RunStatusEnvelope:
-      type: object
-      required: [data, meta]
+      type: "object"
+      required:
+        - "data"
+        - "meta"
       properties:
         data:
-          type: object
-          required: [runId, status, progress, pollAfterMs]
+          type: "object"
+          required:
+            - "runId"
+            - "status"
+            - "progress"
+            - "pollAfterMs"
           properties:
-            runId: { type: string }
-            status: { $ref: '#/components/schemas/RunStatus' }
-            progress: { type: number, minimum: 0, maximum: 1 }
-            startedAt: { type: [string, 'null'], format: date-time }
-            finishedAt: { type: [string, 'null'], format: date-time }
-            pollAfterMs: { type: integer, minimum: 0 }
-        meta: { $ref: '#/components/schemas/RequestMeta' }
+            runId:
+              type: "string"
+            status:
+              $ref: "#/components/schemas/RunStatus"
+            progress:
+              type:
+                - "number"
+                - "null"
+              minimum: 0
+              maximum: 1
+              description: "成功为 1，其余状态 null，不编造执行百分比"
+            startedAt:
+              type:
+                - "string"
+                - "null"
+              format: "date-time"
+            finishedAt:
+              type:
+                - "string"
+                - "null"
+              format: "date-time"
+            pollAfterMs:
+              type: "integer"
+              minimum: 0
+        meta:
+          $ref: "#/components/schemas/RequestMeta"
     ComparisonEnvelope:
-      type: object
-      required: [data, meta]
+      type: "object"
+      required:
+        - "data"
+        - "meta"
       properties:
         data:
-          type: object
-          required: [baselineRunId, candidateRunId, metrics]
+          type: "object"
+          required:
+            - "baselineRunId"
+            - "candidateRunId"
+            - "metrics"
           properties:
-            baselineRunId: { type: string }
-            candidateRunId: { type: string }
+            baselineRunId:
+              type: "string"
+            candidateRunId:
+              type: "string"
             metrics:
-              type: array
+              type: "array"
               items:
-                type: object
-                required: [metricKey, unit, direction, baselineValue, candidateValue, delta, verdict, evidenceCount]
+                type: "object"
+                required:
+                  - "metricKey"
+                  - "unit"
+                  - "direction"
+                  - "baselineValue"
+                  - "candidateValue"
+                  - "delta"
+                  - "verdict"
+                  - "evidenceCount"
                 properties:
-                  metricKey: { type: string }
-                  scenarioKey: { type: [string, 'null'] }
-                  unit: { type: string, example: '%' }
-                  direction: { type: string, enum: [HIGHER_IS_BETTER, LOWER_IS_BETTER] }
-                  baselineValue: { type: number }
-                  candidateValue: { type: number }
-                  delta: { type: number, description: 候选值减基线值 }
-                  verdict: { type: string, enum: [IMPROVEMENT, REGRESSION, UNCHANGED] }
-                  evidenceCount: { type: integer, minimum: 0 }
-        meta: { $ref: '#/components/schemas/RequestMeta' }
+                  metricKey:
+                    type: "string"
+                  scenarioKey:
+                    type:
+                      - "string"
+                      - "null"
+                  unit:
+                    type: "string"
+                    example: "%"
+                  direction:
+                    type: "string"
+                    enum:
+                      - "HIGHER_IS_BETTER"
+                      - "LOWER_IS_BETTER"
+                  baselineValue:
+                    type: "number"
+                  candidateValue:
+                    type: "number"
+                  delta:
+                    type: "number"
+                    description: "候选值减基线值"
+                  verdict:
+                    type: "string"
+                    enum:
+                      - "IMPROVEMENT"
+                      - "REGRESSION"
+                      - "UNCHANGED"
+                  evidenceCount:
+                    type: "integer"
+                    minimum: 0
+        meta:
+          $ref: "#/components/schemas/RequestMeta"
     Sample:
-      type: object
-      required: [id, runId, sampleNumber, scenarioKey, anomalyType, metricKey, status, version]
+      type: "object"
+      required:
+        - "id"
+        - "runId"
+        - "sampleNumber"
+        - "scenarioKey"
+        - "anomalyType"
+        - "metricKey"
+        - "status"
+        - "version"
       properties:
-        id: { type: string }
-        runId: { type: string }
-        sampleNumber: { type: integer }
-        scenarioKey: { type: string }
-        anomalyType: { type: string }
-        metricKey: { type: string }
-        status: { $ref: '#/components/schemas/SampleStatus' }
-        reviewCategory: { anyOf: [ { $ref: '#/components/schemas/ReviewCategory' }, { type: 'null' } ] }
-        assigneeId: { type: [string, 'null'] }
-        conclusion: { type: [string, 'null'] }
-        resolvedAt: { type: [string, 'null'], format: date-time }
-        mediaPath: { type: [string, 'null'] }
-        logExcerpt: { type: [string, 'null'] }
-        version: { type: integer, minimum: 0 }
+        id:
+          type: "string"
+        runId:
+          type: "string"
+        sampleNumber:
+          type: "string"
+          example: "sample_017"
+        scenarioKey:
+          type: "string"
+        anomalyType:
+          type: "string"
+        metricKey:
+          type: "string"
+        status:
+          $ref: "#/components/schemas/SampleStatus"
+        assigneeId:
+          type:
+            - "string"
+            - "null"
+        conclusion:
+          type:
+            - "string"
+            - "null"
+          description: "当前已确认结论；未确认时为 null，草稿另存"
+        resolvedAt:
+          type:
+            - "string"
+            - "null"
+          format: "date-time"
+        mediaPath:
+          type:
+            - "string"
+            - "null"
+        logExcerpt:
+          type:
+            - "string"
+            - "null"
+        version:
+          type: "integer"
+          minimum: 0
+        draftConclusion:
+          type:
+            - "string"
+            - "null"
+        draftUpdatedById:
+          type:
+            - "string"
+            - "null"
+        draftUpdatedAt:
+          type:
+            - "string"
+            - "null"
+          format: "date-time"
+        confirmedById:
+          type:
+            - "string"
+            - "null"
+        confirmedAt:
+          type:
+            - "string"
+            - "null"
+          format: "date-time"
+        confirmedRevision:
+          type: "integer"
+          minimum: 0
+          description: "仅最终确认内容改变时增加；草稿编辑只增加 version"
     SampleDetail:
       allOf:
-        - { $ref: '#/components/schemas/Sample' }
-        - type: object
-          required: [reviewHistory]
+        -
+          $ref: "#/components/schemas/Sample"
+        -
+          type: "object"
+          required:
+            - "reviewHistory"
           properties:
             reviewHistory:
-              type: array
+              type: "array"
               items:
-                type: object
-                required: [reviewerId, fromStatus, toStatus, createdAt]
+                type: "object"
+                required:
+                  - "reviewerId"
+                  - "fromStatus"
+                  - "toStatus"
+                  - "createdAt"
+                  - "mode"
+                  - "conclusion"
+                  - "sourceVersion"
                 properties:
-                  reviewerId: { type: string }
-                  fromStatus: { $ref: '#/components/schemas/SampleStatus' }
-                  toStatus: { $ref: '#/components/schemas/SampleStatus' }
-                  category: { anyOf: [ { $ref: '#/components/schemas/ReviewCategory' }, { type: 'null' } ] }
-                  conclusion: { type: [string, 'null'] }
-                  reopenReason: { type: [string, 'null'] }
-                  createdAt: { type: string, format: date-time }
-    SampleEnvelope: { type: object, required: [data, meta], properties: { data: { $ref: '#/components/schemas/SampleDetail' }, meta: { $ref: '#/components/schemas/RequestMeta' } } }
-    SampleListEnvelope: { type: object, required: [data, meta], properties: { data: { type: array, items: { $ref: '#/components/schemas/Sample' } }, meta: { $ref: '#/components/schemas/PageMeta' } } }
-    AssignmentRequest:
-      type: object
-      additionalProperties: false
-      required: [assigneeId, expectedVersion]
-      properties:
-        assigneeId: { type: string }
-        expectedVersion: { type: integer, minimum: 0 }
-    ReviewRequest:
-      type: object
-      additionalProperties: false
-      required: [category, conclusion, resolve, createBackfillTask, expectedVersion]
-      properties:
-        category: { $ref: '#/components/schemas/ReviewCategory' }
-        conclusion: { type: string, description: resolve=true 时非空 }
-        labels: { type: array, items: { type: string }, default: [] }
-        resolve: { type: boolean }
-        createBackfillTask: { type: boolean }
-        expectedVersion: { type: integer, minimum: 0 }
-    ReopenSampleRequest:
-      type: object
-      additionalProperties: false
-      required: [reason, expectedVersion]
-      properties:
-        reason: { type: string, minLength: 1, maxLength: 500, description: 服务端去除首尾空白后仍须非空 }
-        expectedVersion: { type: integer, minimum: 0 }
-    ReviewEnvelope:
-      type: object
-      required: [data, meta]
+                  reviewerId:
+                    type: "string"
+                  fromStatus:
+                    $ref: "#/components/schemas/SampleStatus"
+                  toStatus:
+                    $ref: "#/components/schemas/SampleStatus"
+                  conclusion:
+                    type:
+                      - "string"
+                      - "null"
+                  reopenReason:
+                    type:
+                      - "string"
+                      - "null"
+                  createdAt:
+                    type: "string"
+                    format: "date-time"
+                  mode:
+                    type: "string"
+                    enum:
+                      - "draft"
+                      - "confirm"
+                      - "modify"
+                      - "reopen"
+                  sourceVersion:
+                    type: "integer"
+                    minimum: 0
+    SampleEnvelope:
+      type: "object"
+      required:
+        - "data"
+        - "meta"
       properties:
         data:
-          type: object
-          required: [sample]
-          properties:
-            sample: { $ref: '#/components/schemas/Sample' }
-            backfillTask: { anyOf: [ { $ref: '#/components/schemas/BackfillTask' }, { type: 'null' } ] }
-        meta: { $ref: '#/components/schemas/RequestMeta' }
-    CreateBackfillRequest:
-      type: object
-      additionalProperties: false
-      required: [anomalySampleId, reason, assigneeId]
+          $ref: "#/components/schemas/SampleDetail"
+        meta:
+          $ref: "#/components/schemas/RequestMeta"
+    SampleListEnvelope:
+      type: "object"
+      required:
+        - "data"
+        - "meta"
       properties:
-        anomalySampleId: { type: string }
-        reason: { type: string, minLength: 1 }
-        assigneeId: { type: string }
-    UpdateBackfillRequest:
-      type: object
-      additionalProperties: false
-      required: [status]
-      properties:
-        status: { $ref: '#/components/schemas/BackfillStatus' }
-        assigneeId: { type: string }
-        resolutionNote: { type: string }
-    BackfillTask:
-      type: object
-      required: [id, anomalySampleId, reason, status, assigneeId]
-      properties:
-        id: { type: string }
-        anomalySampleId: { type: string }
-        reason: { type: string }
-        status: { $ref: '#/components/schemas/BackfillStatus' }
-        assigneeId: { type: string }
-        resolutionNote: { type: [string, 'null'] }
-    BackfillEnvelope: { type: object, required: [data, meta], properties: { data: { $ref: '#/components/schemas/BackfillTask' }, meta: { $ref: '#/components/schemas/RequestMeta' } } }
-    CreateReportRequest:
-      type: object
-      additionalProperties: false
-      required: [runId, baselineRunId]
-      properties:
-        runId: { type: string }
-        baselineRunId: { type: string }
-    Report:
-      type: object
-      required: [id, runId, baselineRunId, status, summary, findings, evidenceSampleIds, provider]
-      properties:
-        id: { type: string }
-        runId: { type: string }
-        baselineRunId: { type: string }
-        status: { $ref: '#/components/schemas/ReportStatus' }
-        summary: { type: string }
-        findings:
-          type: array
+        data:
+          type: "array"
           items:
-            type: object
-            required: [category, summary, evidenceSampleIds]
+            $ref: "#/components/schemas/Sample"
+        meta:
+          $ref: "#/components/schemas/PageMeta"
+    AssignmentRequest:
+      type: "object"
+      additionalProperties: false
+      required:
+        - "assigneeId"
+        - "expectedVersion"
+      properties:
+        assigneeId:
+          type: "string"
+        expectedVersion:
+          type: "integer"
+          minimum: 0
+    ReviewRequest:
+      type: "object"
+      additionalProperties: false
+      required:
+        - "conclusion"
+        - "mode"
+        - "expectedVersion"
+      properties:
+        conclusion:
+          type: "string"
+          minLength: 1
+          maxLength: 4000
+          description: "trim 后非空的自由文本；不要求人工分类"
+        mode:
+          type: "string"
+          enum:
+            - "draft"
+            - "confirm"
+          description: "confirm 仅评测人员；再次确认修改已有结论"
+        expectedVersion:
+          type: "integer"
+          minimum: 0
+    ReopenSampleRequest:
+      type: "object"
+      additionalProperties: false
+      required:
+        - "reason"
+        - "expectedVersion"
+      properties:
+        reason:
+          type: "string"
+          minLength: 1
+          maxLength: 500
+          description: "服务端去除首尾空白后仍须非空"
+        expectedVersion:
+          type: "integer"
+          minimum: 0
+    ReviewEnvelope:
+      type: "object"
+      required:
+        - "data"
+        - "meta"
+      properties:
+        data:
+          type: "object"
+          required:
+            - "sample"
+          properties:
+            sample:
+              $ref: "#/components/schemas/Sample"
+        meta:
+          $ref: "#/components/schemas/RequestMeta"
+    CreateReportRequest:
+      type: "object"
+      additionalProperties: false
+      required:
+        - "runId"
+      properties:
+        runId:
+          type: "string"
+        baselineRunId:
+          type:
+            - "string"
+            - "null"
+          description: "可不选；若提供须成功且同口径"
+    Report:
+      type: "object"
+      required:
+        - "id"
+        - "runId"
+        - "baselineRunId"
+        - "status"
+        - "summary"
+        - "findings"
+        - "evidenceSampleIds"
+        - "provider"
+        - "isStale"
+        - "sourceReviewVersions"
+      properties:
+        id:
+          type: "string"
+        runId:
+          type: "string"
+        baselineRunId:
+          type:
+            - "string"
+            - "null"
+        status:
+          $ref: "#/components/schemas/ReportStatus"
+        summary:
+          type: "string"
+        findings:
+          type: "array"
+          items:
+            type: "object"
+            required:
+              - "summary"
+              - "evidenceSampleIds"
             properties:
-              category: { type: string, enum: [MODEL_ISSUE, DATA_ISSUE] }
-              summary: { type: string }
-              evidenceSampleIds: { type: array, items: { type: string } }
-        evidenceSampleIds: { type: array, items: { type: string } }
-        provider: { type: string, example: cached }
-        confirmedById: { type: [string, 'null'] }
-        confirmedAt: { type: [string, 'null'], format: date-time }
-    ReportEnvelope: { type: object, required: [data, meta], properties: { data: { $ref: '#/components/schemas/Report' }, meta: { $ref: '#/components/schemas/RequestMeta' } } }
+              summary:
+                type: "string"
+              evidenceSampleIds:
+                type: "array"
+                items:
+                  type: "string"
+        evidenceSampleIds:
+          type: "array"
+          items:
+            type: "string"
+        provider:
+          type: "string"
+          example: "cached"
+        confirmedById:
+          type:
+            - "string"
+            - "null"
+        confirmedAt:
+          type:
+            - "string"
+            - "null"
+          format: "date-time"
+        isStale:
+          type: "boolean"
+          description: "来源确认版本变更；过时报告保留历史但不能确认或冒充当前结论"
+        staleAt:
+          type:
+            - "string"
+            - "null"
+          format: "date-time"
+        sourceReviewVersions:
+          type: "object"
+          additionalProperties:
+            type: "integer"
+            minimum: 0
+          description: "样本 ID 到已确认结论版本的输入快照"
+    ReportEnvelope:
+      type: "object"
+      required:
+        - "data"
+        - "meta"
+      properties:
+        data:
+          $ref: "#/components/schemas/Report"
+        meta:
+          $ref: "#/components/schemas/RequestMeta"
+    TargetCreateRunRequest:
+      type: "object"
+      additionalProperties: false
+      required:
+        - "name"
+        - "modelVersionId"
+        - "datasetVersionId"
+        - "benchmarkId"
+        - "episodeCount"
+        - "simulationSeed"
+        - "acceptQualityWarning"
+      properties:
+        name:
+          type: "string"
+          minLength: 1
+          maxLength: 120
+        modelVersionId:
+          $ref: "#/components/schemas/ResourceId"
+        datasetVersionId:
+          $ref: "#/components/schemas/ResourceId"
+        benchmarkId:
+          $ref: "#/components/schemas/ResourceId"
+        baselineRunId:
+          anyOf:
+            -
+              $ref: "#/components/schemas/ResourceId"
+            -
+              type: "null"
+          description: "可省略；有基线才核对同口径"
+        episodeCount:
+          type: "integer"
+          minimum: 1
+          maximum: 10000
+          description: "还须处于所选目录允许范围；具体矩阵在实施前定稿"
+        simulationSeed:
+          type: "integer"
+          minimum: 0
+          maximum: 2147483647
+        acceptQualityWarning:
+          type: "boolean"
+        mockFailure:
+          type: "boolean"
+          default: false
+          description: "明确的故障演示，重试默认清除"
+        successRateThreshold:
+          type:
+            - "number"
+            - "null"
+          enum:
+            - 0.8
+            - 0.85
+            - null
+          description: "总体成功率目标，可不设，与历史比较基线不同"
+      description: "已认可的新原型目标，当前 POST 仍使用 CreateRunRequest；此结构待实现。"
+    EvaluationCatalogEnvelope:
+      type: "object"
+      required:
+        - "data"
+        - "meta"
+      properties:
+        data:
+          type: "object"
+          required:
+            - "models"
+            - "datasets"
+            - "benchmarks"
+          properties:
+            models:
+              type: "array"
+              items:
+                type: "object"
+                required:
+                  - "id"
+                  - "projectId"
+                  - "name"
+                  - "version"
+                properties:
+                  id:
+                    $ref: "#/components/schemas/ResourceId"
+                  projectId:
+                    $ref: "#/components/schemas/ResourceId"
+                  name:
+                    type: "string"
+                  version:
+                    type: "string"
+            datasets:
+              type: "array"
+              items:
+                type: "object"
+                required:
+                  - "id"
+                  - "projectId"
+                  - "name"
+                  - "version"
+                  - "qualityStatus"
+                  - "sampleCount"
+                properties:
+                  id:
+                    $ref: "#/components/schemas/ResourceId"
+                  projectId:
+                    $ref: "#/components/schemas/ResourceId"
+                  name:
+                    type: "string"
+                  version:
+                    type: "string"
+                  qualityStatus:
+                    $ref: "#/components/schemas/QualityStatus"
+                  sampleCount:
+                    type: "integer"
+                    minimum: 0
+            benchmarks:
+              type: "array"
+              items:
+                type: "object"
+                required:
+                  - "id"
+                  - "projectId"
+                  - "name"
+                  - "version"
+                  - "compatibleModelVersionIds"
+                  - "compatibleDatasetVersionIds"
+                  - "minEpisodeCount"
+                  - "maxEpisodeCount"
+                properties:
+                  id:
+                    $ref: "#/components/schemas/ResourceId"
+                  projectId:
+                    $ref: "#/components/schemas/ResourceId"
+                  name:
+                    type: "string"
+                  version:
+                    type: "string"
+                  compatibleModelVersionIds:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/ResourceId"
+                  compatibleDatasetVersionIds:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/ResourceId"
+                  minEpisodeCount:
+                    type: "integer"
+                    minimum: 1
+                  maxEpisodeCount:
+                    type: "integer"
+                    minimum: 1
+                  successDefinition:
+                    type: "string"
+                  metricKeys:
+                    type: "array"
+                    items:
+                      type: "string"
+        meta:
+          $ref: "#/components/schemas/RequestMeta"
+    DeleteRunEnvelope:
+      type: "object"
+      required:
+        - "data"
+        - "meta"
+      properties:
+        data:
+          type: "object"
+          required:
+            - "runId"
+            - "deletedAt"
+          properties:
+            runId:
+              $ref: "#/components/schemas/ResourceId"
+            deletedAt:
+              type: "string"
+              format: "date-time"
+        meta:
+          $ref: "#/components/schemas/RequestMeta"

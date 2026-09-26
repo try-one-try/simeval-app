@@ -21,7 +21,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <div className="mobile-story mobile-only"><p className="muted">固定故事</p><p>总体成功率提升，但遮挡场景碰撞增加</p><p className="muted">演示路径</p><p>质量 → 评测 → 对比 → 证据 → 报告</p></div>
           <div className="hero-actions"><form action={enterDemo}><DemoSubmit /></form><Link href="#workflow" className="secondary-button">了解流程 ↓</Link></div>
           {error && <p role="alert" className="entry-error">{error === "setup" ? "演示环境尚未准备，请按 README 完成配置。" : "暂时无法进入演示，请稍后重试。"}</p>}
-          <p className="fine-print">合成数据 · 模拟评测 · 当前开放项目总览</p>
+          <p className="fine-print">合成数据 · 模拟评测 · 当前开放总览、质量与评测</p>
         </div>
         <aside className="story-preview" aria-label="固定合成故事示意，后续业务功能尚未开放">
           <div className="preview-header"><span>一次评测</span><span>01 / 03 · 合成示意</span></div>
