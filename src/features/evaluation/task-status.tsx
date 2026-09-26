@@ -61,9 +61,9 @@ export function TaskStatus({ initialRun, actor }: { initialRun: RunData; actor: 
   const title = run.status === "QUEUED" ? "模拟评测等待执行" : active ? "模拟评测执行中" : run.status === "SUCCEEDED" ? "模拟评测已完成" : run.status === "FAILED" ? "模拟评测未完成" : "本次模拟评测已取消";
   const conclusion = active ? "任务尚未完成，结果暂不可用。" : run.status === "SUCCEEDED" ? "可与基线比较，重点检查遮挡场景。" : run.status === "FAILED" ? "模拟执行失败，本次未生成结果。" : "任务已停止，本次没有可用于对比的结果。";
   return <section className="content workflow-content task-view">
-    <div className="page-context">创建评测 / {run.status}<span>任务步骤　01 配置与确认　02 任务状态</span></div>
+    <div className="page-context">评测任务 / {run.status}<span>已保存的任务状态</span></div>
     <div className="overview-heading" aria-live="polite"><div><h1>{title}</h1><p className="muted">{run.modelName} {run.modelVersion} · {run.datasetName} {run.datasetVersion}</p></div><div className="overview-status"><strong>{run.status} · {labels[run.status]}</strong><p className="muted">Mock Provider · 合成数据</p></div></div>
-    <div className="conclusion"><p>{run.status === "FAILED" ? "失败原因 · 故障演示" : "任务判断"}</p><h2>{conclusion}</h2><p className="muted">{run.errorMessage ?? (run.status === "SUCCEEDED" ? "指标与 " + run.anomalyCount + " 条待复核异常已保存；模型对比将在下一阶段开放。" : active ? "状态会自动同步，也可手动刷新。退出页面不会删除任务。" : "记录保留，如需再次评测，请重新配置。")}</p></div>
+    <div className="conclusion"><p>{run.status === "FAILED" ? "失败原因 · 故障演示" : "任务判断"}</p><h2>{conclusion}</h2><p className="muted">{run.errorMessage ?? (run.status === "SUCCEEDED" ? "指标与 " + run.anomalyCount + " 条异常记录已保存；模型对比将在后续阶段开放。" : active ? "状态会自动同步，也可手动刷新。退出页面不会删除任务。" : "记录保留，如需再次评测，请重新配置。")}</p></div>
     <h2 className="section-title">任务进度</h2>
     <ol className="task-stages"><li aria-current={run.status === "QUEUED" ? "step" : undefined}><strong>01 QUEUED</strong><span>任务已保存</span></li><li aria-current={run.status === "RUNNING" ? "step" : undefined}><strong>02 RUNNING</strong><span>{run.startedAt ? "已开始执行" : "尚未执行"}</span></li><li aria-current={!active ? "step" : undefined}><strong>03 {active ? "结果" : run.status}</strong><span>{run.status === "SUCCEEDED" ? "结果已保存" : active ? "尚未生成结果" : "未生成本次结果"}</span></li></ol>
     <dl className="task-facts"><div><dt>Benchmark</dt><dd>{run.benchmarkName} {run.benchmarkVersion}</dd></div><div><dt>Episode 数量</dt><dd>{run.episodeCount}</dd></div><div><dt>模拟 Seed</dt><dd>{run.simulationSeed}</dd></div></dl>
@@ -72,8 +72,8 @@ export function TaskStatus({ initialRun, actor }: { initialRun: RunData; actor: 
     <div className="workflow-actions">
       {active ? <><button className="primary-button" onClick={() => { void refresh(); }} disabled={busy}>刷新任务状态 →</button>{canWrite && !run.isDemoFixture && <button ref={cancelButton} className="text-action" onClick={() => { dialog.current?.showModal(); setConfirming(true); continueButton.current?.focus(); }} disabled={busy}>取消任务</button>}</>
         : run.status === "FAILED" && canWrite && !run.isDemoFixture ? <><button className="primary-button" onClick={retry} disabled={busy}>{busy ? "正在创建…" : "创建重试任务 →"}</button><Link className="text-action" href="/evaluations/new">重新配置 ↗</Link></>
-        : run.status === "SUCCEEDED" ? <><button className="primary-button" disabled>查看模型对比 · 下一阶段开放</button><Link className="text-action" href="/evaluations/new">新建评测 ↗</Link></>
-        : <Link className="primary-button" href="/evaluations/new">重新配置评测 →</Link>}
+        : run.status === "SUCCEEDED" ? <><Link className="primary-button" href={actor.role === "REVIEWER" ? "/anomalies" : "/comparisons"}>{actor.role === "REVIEWER" ? "查看异常复核 →" : "查看模型对比 →"}</Link>{actor.role === "ENGINEER" && <Link className="text-action" href="/evaluations/new">新建评测 ↗</Link>}</>
+        : actor.role === "ENGINEER" ? <Link className="primary-button" href="/evaluations/new">重新配置评测 →</Link> : <Link className="primary-button" href="/evaluations">返回评测任务 →</Link>}
     </div>
     {run.retryOfRunId && <p className="fine-print">这是独立的重试任务；<Link className="inline-link" href={"/evaluations/" + run.retryOfRunId}>查看原失败记录 ↗</Link></p>}
     <details className="recent-runs"><summary>任务记录</summary><p>{run.name}</p><p>创建时间：{new Date(run.createdAt).toLocaleString("zh-CN")}</p><p>任务编号：{run.id}</p><p>模型：{run.modelName} {run.modelVersion}；数据集：{run.datasetName} {run.datasetVersion}</p><p>Benchmark：{run.benchmarkName} {run.benchmarkVersion}；{run.episodeCount} Episode；Seed {run.simulationSeed}</p><p>合成数据 · {run.provider}</p></details>

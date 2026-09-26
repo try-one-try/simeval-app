@@ -1,14 +1,12 @@
 import Link from "next/link";
 // 公开入口展示产品价值；故事预览是合成示意，登录建立真实服务端会话。
-import { enterDemo } from "@/server/auth/actions";
-import { DemoSubmit } from "@/components/demo-submit";
 import { MobileNavigation } from "@/components/workspace-navigation";
 export default async function HomePage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
   return <div className="landing">
     <header className="site-header">
       <Link href="/" className="brand">simeval.</Link>
-      <nav className="landing-nav" aria-label="首页导航"><Link href="#workflow">产品概览</Link><form action={enterDemo}><DemoSubmit compact /></form><span className="eyebrow">SYNTHETIC DEMO</span></nav>
+      <nav className="landing-nav" aria-label="首页导航"><Link href="#workflow">产品概览</Link><Link href="/login">体验演示 ↗</Link><span className="eyebrow">SYNTHETIC DEMO</span></nav>
       <MobileNavigation />
     </header>
     <main>
@@ -19,7 +17,7 @@ export default async function HomePage({ searchParams }: { searchParams: Promise
           <h2 className="mobile-only">具身智能团队的评测数据工作台</h2>
           <p className="hero-copy">SimEval 帮助团队检查数据质量、比较模型版本、复核异常样本，并形成有证据的评测报告。</p>
           <div className="mobile-story mobile-only"><p className="muted">固定故事</p><p>总体成功率提升，但遮挡场景碰撞增加</p><p className="muted">演示路径</p><p>质量 → 评测 → 对比 → 证据 → 报告</p></div>
-          <div className="hero-actions"><form action={enterDemo}><DemoSubmit /></form><Link href="#workflow" className="secondary-button">了解流程 ↓</Link></div>
+          <div className="hero-actions"><Link href="/login" className="primary-button">体验一次评测 →</Link><Link href="#workflow" className="secondary-button">了解流程 ↓</Link></div>
           {error && <p role="alert" className="entry-error">{error === "setup" ? "演示环境尚未准备，请按 README 完成配置。" : "暂时无法进入演示，请稍后重试。"}</p>}
           <p className="fine-print">合成数据 · 模拟评测 · 当前开放总览、质量与评测</p>
         </div>

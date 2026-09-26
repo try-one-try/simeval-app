@@ -1,6 +1,6 @@
 # SimEval 架构设计
 
-**2026-09-27：按认可的产品原型修订目标架构；本次未改代码或数据库。** 已运行的是工程基础和第一版质量／评测；两个身份、自主配置、任务上下文与删除仍待改造。行为看[规格](../specs/002-quality-evaluation/spec.md)，HTTP 字段和实现状态看 [OpenAPI](openapi.yaml)。
+**2026-09-27：双身份入口、真实切换和角色导航已接通，待负责人验收。** 第一版质量／评测继续可运行；自主配置、完整任务上下文和删除留阶段 4。本轮复用现有用户，未改 Schema、迁移或开发库 Seed。行为看[规格](../specs/002-quality-evaluation/spec.md)，HTTP 字段和实现状态看 [OpenAPI](openapi.yaml)。
 
 ## 1. 运行边界
 
@@ -11,6 +11,9 @@ Next.js、TypeScript、Auth.js、Prisma、MySQL 组成模块化单体，一个�
 | 位置 | 职责 |
 |---|---|
 | `src/app/(workspace)/` | 核对会话，组合各板块页面 |
+| `src/lib/demo-identity.ts`、`src/lib/workspace-navigation.ts` | 公开身份、入口和导航定义；不含口令 |
+| `src/server/auth/`、`src/auth.ts` | 身份 Zod／账号／密码摘要校验，Auth.js JWT 会话，页面门禁 |
+| `src/features/identity/`、`src/app/login/` | 原生单选组与切换弹层；Server Action 建立对应会话 |
 | `src/features/` | 表单、任务选择、结果与交互状态；客户端不访问 Prisma |
 | `src/app/api/`、`src/server/http/api.ts` | HTTP 入口；身份／角色／Origin／Zod、统一错误和 requestId |
 | `src/server/application/` | 组织完整用例，输出不含密钥的 DTO |
@@ -32,7 +35,9 @@ flowchart LR
   R --> DB[(MySQL)]
 ~~~
 
-首屏由 Server Component 直接调用应用服务；浏览器交互通过 HTTP。当前 Mock 在事务内只做本地纯计算；未来外部执行与 AI 网络请求放到事务外，校验结果后用短事务保存。
+登录／切换走 Server Action：所选身份 → 服务端读取演示口令 → Credentials 核对预设 email、isDemo、数据库角色和 bcrypt 摘要 → Auth.js 更新 Cookie → 角色默认页。页面与 HTTP 每次用会话 userId 重新查数据库；历史 ADMIN 或不匹配账号视为失效。切换前不退出原账号，认证失败仍可返回原会话。
+
+首屏由 Server Component 直接调用应用服务；业务交互通过 HTTP。当前 Mock 在事务内只做本地纯计算；未来外部执行与 AI 网络请求放到事务外，校验结果后用短事务保存。
 
 ## 3. 新产品怎样映射到工程
 
@@ -62,7 +67,7 @@ flowchart LR
 
 草稿保存只增加编辑 version；最终结论内容改变才增加 confirmedRevision 并令旧报告过时。报告确认时再次核对来源版本，避免“生成时有效、确认时已过期”。
 
-当前 Schema／Seed 仍含 ADMIN、分类和 BackfillTask；这是旧数据事实。新产品不开放第三角色、分类步骤或回补管理；迁移需保留历史关联，再决定兼容字段处理。演示目标为各一个工程师和评测人员，模拟 Seed 与数据库 Seed 分别负责结果复现和初始化故事。
+当前 Schema／Seed 仍含 ADMIN、分类和 BackfillTask；这是旧数据事实。新产品不开放第三角色、分类步骤或回补管理；迁移需保留历史关联，再决定兼容字段处理。登录已复用各一个工程师和评测人员；历史管理员不能进入产品会话。模拟 Seed 与数据库 Seed 分别负责结果复现和初始化故事。
 
 ## 5. 当前可运行行为与写入保护
 

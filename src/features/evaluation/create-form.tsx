@@ -14,7 +14,7 @@ export function CreateForm({ options, actor }: { options: EvaluationOptions; act
   const [modelId, setModelId] = useState(options.models.find((item) => item.id !== firstBaseline?.modelVersionId)?.id ?? "");
   const [datasetId, setDatasetId] = useState(firstBaseline?.datasetVersionId ?? options.datasets[0]?.dataset.id ?? "");
   const [benchmarkId, setBenchmarkId] = useState(firstBaseline?.benchmarkId ?? options.benchmarks[0]?.id ?? "");
-  const [name, setName] = useState("仓储操作模拟评测");
+  const [name, setName] = useState("");
   const [accepted, setAccepted] = useState(false);
   const [mockFailure, setMockFailure] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -25,7 +25,7 @@ export function CreateForm({ options, actor }: { options: EvaluationOptions; act
   const warning = quality?.dataset.qualityStatus === "WARNING";
   const canWrite = actor.role !== "REVIEWER";
   const compatible = baseline?.datasetVersionId === datasetId && baseline?.benchmarkId === benchmarkId && baseline?.modelVersionId !== modelId;
-  const enabled = canWrite && quality?.canStartEvaluation && compatible && (!warning || accepted) && !!modelId && !!baseline;
+  const enabled = canWrite && quality?.canStartEvaluation && compatible && (!warning || accepted) && !!modelId && !!baseline && name.trim().length > 0;
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!enabled || !baseline || busy) return;
@@ -44,6 +44,8 @@ export function CreateForm({ options, actor }: { options: EvaluationOptions; act
     <div className="conclusion"><p>质量前提</p><h2>{!quality ? "暂无可用数据集。" : !quality.canStartEvaluation ? "数据集质量未通过，不能创建评测。" : warning ? quality.checks.filter((item) => item.status === "WARNING").map((item) => item.message).join(" ") : "数据质量通过，可以继续。"}</h2><p className="muted">{warning ? "只有明确了解质量警告后，才能继续提交。" : "配置须与成功基线保持相同口径。"} <Link href="/quality" className="inline-link">查看质量详情 ↗</Link></p></div>
     <form onSubmit={submit}>
       <div className="evaluation-fields">
+        {/* 任务名是识别本次评测的核心输入，首屏填写，不折叠到更多设置。 */}
+        <label className="task-name-field">任务名称<input name="name" value={name} maxLength={120} required disabled={busy} aria-describedby="task-name-hint" placeholder="例如：v2.4 遮挡场景评测" onChange={(event) => setName(event.target.value)} /><span id="task-name-hint" className="fine-print">必填，1–120 字</span></label>
         <label className="model-field">候选模型<select value={modelId} onChange={(event) => setModelId(event.target.value)} disabled={busy}>{options.models.filter((item) => item.id !== baseline?.modelVersionId).map((item) => <option key={item.id} value={item.id}>{item.name} {item.version}</option>)}</select></label>
         <label className="baseline-field">成功基线<select value={baselineId} onChange={(event) => setBaselineId(event.target.value)} disabled={busy}>{options.baselines.map((item) => <option key={item.id} value={item.id}>{item.modelName} {item.modelVersion} · 已完成</option>)}</select></label>
         <label className="dataset-field">数据集<select value={datasetId} onChange={(event) => { setDatasetId(event.target.value); setAccepted(false); }} disabled={busy}>{options.datasets.map(({ dataset }) => <option key={dataset.id} value={dataset.id}>{dataset.name} {dataset.version}</option>)}</select></label>
@@ -53,7 +55,7 @@ export function CreateForm({ options, actor }: { options: EvaluationOptions; act
       </div>
       {!compatible && <p className="risk-text">请选择与成功基线一致的数据集和 Benchmark，以及不同的候选模型。</p>}
       {warning && <label className="warning-consent"><input type="checkbox" checked={accepted} disabled={busy} onChange={(event) => setAccepted(event.target.checked)} />我已了解质量警告，仍继续本次模拟评测。</label>}
-      <details className="advanced-settings"><summary>更多设置与故障演示</summary><label>任务名称<input value={name} maxLength={120} required disabled={busy} onChange={(event) => setName(event.target.value)} /></label><label className="warning-consent"><input type="checkbox" checked={mockFailure} disabled={busy} onChange={(event) => setMockFailure(event.target.checked)} />模拟执行失败（仅用于演示失败与重试，不运行真实仿真）</label></details>
+      <details className="advanced-settings"><summary>更多设置与故障演示</summary><label className="warning-consent"><input type="checkbox" checked={mockFailure} disabled={busy} onChange={(event) => setMockFailure(event.target.checked)} />模拟执行失败（仅用于演示失败与重试，不运行真实仿真）</label></details>
       {!canWrite && <p className="risk-text">复核员可查看任务；创建评测需要算法工程师或管理员角色。</p>}
       {error && <div role="alert" className="request-error"><p>{error}</p>{Object.entries(fields).map(([key, values]) => <p key={key}>{values.join("；")}</p>)}<Link href="/" className="inline-link">重新进入演示 ↗</Link></div>}
       <div className="workflow-actions"><button type="submit" disabled={!enabled || busy} className="primary-button">{busy ? "正在创建…" : "创建模拟评测 →"}</button></div>

@@ -64,7 +64,7 @@ button:disabled { cursor:not-allowed; }
 .nav-item { display:block; min-height:70px; }
 .nav-name { display:flex; align-items:center; justify-content:space-between; font-size:16px; }
 .nav-item[aria-current] .nav-name { font-weight:700; }
-.nav-item[aria-current] .nav-name:before { content:""; position:absolute; width:32px; height:1.5px; background:var(--ink); margin-top:32px; }
+.nav-item[aria-current] .nav-name:before { content:""; position:absolute; width:64px; height:1.5px; background:var(--ink); margin-top:32px; }
 .nav-description,.nav-arrow { opacity:0; transition:opacity .15s ease; }
 .nav-description { display:block; font-size:10px; margin-top:8px; color:var(--muted); white-space:nowrap; }
 .sidebar.is-expanded .nav-description,.sidebar.is-expanded .nav-arrow { opacity:1; }
@@ -182,6 +182,8 @@ button:disabled { cursor:not-allowed; }
 .workflow-actions { display:flex; align-items:center; gap:24px; margin:48px 0 18px; }
 .workflow-actions .primary-button { min-width:252px; min-height:52px; }
 .evaluation-fields { display:grid; grid-template-columns:1fr 1fr; column-gap:40px; row-gap:18px; max-width:760px; }
+.task-name-field { grid-column:1 / -1; }
+.evaluation-fields .task-name-field input { display:block; width:100%; font-size:14px; color:var(--ink); background:transparent; padding:10px 0; min-height:44px; border:0; border-bottom:1px solid var(--line); border-radius:0; }
 .evaluation-fields label,.readonly-field,.advanced-settings > label { display:block; font-size:11px; color:var(--muted); }
 .evaluation-fields select,.advanced-settings input:not([type=checkbox]) { display:block; width:100%; font:inherit; font-size:14px; color:var(--ink); background:transparent; padding:10px 0; min-height:44px; border:0; border-bottom:1px solid var(--line); border-radius:0; }
 .readonly-field p { font-size:14px; color:var(--ink); padding:10px 0; }
@@ -223,6 +225,51 @@ button:disabled { cursor:not-allowed; }
 }
 
 .mobile-task-facts { display:none; }
+/* 身份入口沿用 Figma 的双列、下划线字段与少量黑色主操作，不增加选项卡框。 */
+.sr-only { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip-path:inset(50%); white-space:nowrap; border:0; }
+.identity-login { max-width:1180px; margin:0 auto; padding:180px 0 80px; display:grid; grid-template-columns:minmax(0,540px) minmax(0,480px); gap:130px; }
+.identity-intro { display:grid; gap:16px; align-content:start; }
+.identity-intro .brand,.identity-intro h1 { font-size:28px; line-height:1.45; font-weight:600; }
+.identity-intro > .muted { font-size:15px; }
+.identity-entry h2 { font-size:24px; font-weight:600; margin-bottom:12px; }
+.identity-entry > .muted { font-size:12px; }
+.identity-fields { border:0; padding:0; margin:20px 0 28px; display:grid; gap:16px; min-width:0; }
+.identity-option { display:grid; gap:5px; min-height:88px; cursor:pointer; }
+.identity-choice { display:flex; gap:7px; align-items:center; padding-bottom:6px; border-bottom:1px solid var(--line); font-size:18px; }
+.identity-choice input { appearance:auto; accent-color:var(--ink); width:16px; height:16px; margin:0; flex-shrink:0; }
+.identity-option.is-selected .identity-choice { font-weight:650; }
+.identity-description { font-size:11px; color:var(--muted); }
+.identity-entry .primary-button { width:252px; min-height:52px; font-size:12px; }
+.identity-entry .entry-error { margin:16px 0 0; }
+.identity-trigger { border:0; border-radius:6px; background:var(--soft); color:var(--muted); min-height:44px; padding:10px 14px; text-align:left; font-size:13px; flex-shrink:0; }
+.identity-trigger strong { color:var(--ink); font-weight:500; }
+.identity-dialog-heading { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.identity-dialog-heading h2 { font-size:20px; }
+.identity-dialog .primary-button { min-height:48px; }
+.nav-overview { margin-top:48px; }
+.nav-overview .nav-name { font-size:13px; }
+.legacy-notice { padding:14px clamp(32px,7.5vw,108px) 0; color:var(--muted); font-size:11px; }
+.task-list { list-style:none; margin:24px 0; padding:0; }
+.task-list li a { display:flex; gap:24px; justify-content:space-between; padding:20px 0; border-bottom:1px solid var(--line); }
+.task-list strong { font-size:15px; font-weight:500; }
+.task-list small { display:block; color:var(--muted); overflow-wrap:anywhere; }
+.task-list-state { flex-shrink:0; font-size:12px; }
+.task-list-empty { padding:32px 0; color:var(--muted); }
+@media(max-width:1250px) {
+  .identity-login { margin:0 64px; gap:80px; }
+}
+@media(max-width:767px) {
+  .identity-login { margin:0; padding:48px 24px; grid-template-columns:1fr; gap:48px; }
+  .identity-intro .brand,.identity-intro h1 { font-size:24px; }
+  .identity-entry h2 { font-size:22px; }
+  .identity-entry .primary-button { width:100%; min-height:48px; }
+  .identity-trigger { grid-column:1 / -1; grid-row:2; width:100%; }
+  .workspace-top { display:grid; grid-template-columns:1fr auto; gap:12px; height:auto; min-height:64px; }
+  .workspace-top .menu-trigger { grid-column:2; grid-row:1; }
+  .nav-overview { margin-top:24px; }
+  .legacy-notice { padding:12px 24px 0; }
+  .task-list li a { gap:12px; }
+}
 @media(max-width:767px) {
   .workflow-content h1 { margin-bottom:0; line-height:1.3; }
   .workflow-content .overview-heading { margin-bottom:20px; }

@@ -9,14 +9,23 @@ import { GET,POST } from "@/app/api/evaluation-runs/route";
 import { GET as statusGET } from "@/app/api/evaluation-runs/[runId]/status/route";
 const body={name:"任务",modelVersionId:"candidate",datasetVersionId:"dataset",benchmarkId:"benchmark",baselineRunId:"baseline",episodeCount:200,simulationSeed:20260901,acceptQualityWarning:true};
 function request(override:Partial<RequestInit>={}) { return new Request("http://localhost:3000/api/evaluation-runs",{method:"POST",headers:{"content-type":"application/json","origin":"http://localhost:3000","idempotency-key":"test-key"},body:JSON.stringify(body),...override}); }
-beforeEach(()=>{ vi.clearAllMocks(); mocks.auth.mockResolvedValue({user:{id:"user"}}); mocks.user.mockResolvedValue({id:"user",role:"ENGINEER"}); mocks.create.mockResolvedValue({data:{id:"created"},replay:false}); });
+beforeEach(()=>{ vi.clearAllMocks(); mocks.auth.mockResolvedValue({user:{id:"user"}}); mocks.user.mockResolvedValue({id:"user",role:"ENGINEER",email:"engineer@demo.simeval.local",isDemo:true}); mocks.create.mockResolvedValue({data:{id:"created"},replay:false}); });
 it("未登录返回 401 JSON，复核员写入返回 403",async()=>{
   mocks.auth.mockResolvedValue(null); expect((await POST(request())).status).toBe(401);
-  mocks.auth.mockResolvedValue({user:{id:"user"}}); mocks.user.mockResolvedValue({id:"user",role:"REVIEWER"});
+  mocks.auth.mockResolvedValue({user:{id:"user"}}); mocks.user.mockResolvedValue({id:"user",role:"REVIEWER",email:"reviewer@demo.simeval.local",isDemo:true});
   const response=await POST(request());expect(response.status).toBe(403);expect(mocks.create).not.toHaveBeenCalled();
 });
 it("拒绝跨站或缺少 Origin 的写操作",async()=>{
   for(const origin of ["http://evil.invalid",""]) expect((await POST(request({headers:{"content-type":"application/json","origin":origin}}))).status).toBe(403);
+  expect(mocks.create).not.toHaveBeenCalled();
+});
+it.each([
+  {role:"ADMIN",email:"admin@demo.simeval.local",isDemo:true},
+  {role:"ENGINEER",email:"engineer@demo.simeval.local",isDemo:false},
+  {role:"REVIEWER",email:"engineer@demo.simeval.local",isDemo:true},
+])("旧会话账号不符合双身份约定时返回 401：$role/$isDemo",async(account)=>{
+  mocks.user.mockResolvedValue({id:"user",...account});
+  expect((await POST(request())).status).toBe(401);
   expect(mocks.create).not.toHaveBeenCalled();
 });
 it("同源按真实 Host 校验，允许内部 localhost 与访问地址不同",async()=>{

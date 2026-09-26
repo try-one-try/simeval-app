@@ -6,6 +6,7 @@ import { compare } from "bcryptjs";
 import { PrismaClient } from "../../src/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import { parseDatabaseUrl } from "../../src/lib/database-url";
+import { isDemoAccount } from "../../src/lib/demo-identity";
 
 vi.mock("server-only", () => ({}));
 
@@ -66,10 +67,18 @@ describe.skipIf(!testUrl)("独立 MySQL 测试库", () => {
       } finally {
         await getDb().$disconnect();
       }
-      const engineer = await db.user.findUnique({ where: { id: "demo-user-engineer" }, select: { passwordHash: true } });
       const demoPassword = process.env.DEMO_PASSWORD;
-      if (!engineer || !demoPassword) throw new Error("Seed engineer or demo password missing");
-      expect(await compare(demoPassword, engineer.passwordHash)).toBe(true);
+      if (!demoPassword) throw new Error("Seed demo password missing");
+      // 两个公开身份都能认证；历史管理员只保留数据，不成为第三个产品入口。
+      for (const id of ["demo-user-engineer", "demo-user-reviewer"]) {
+        const account = await db.user.findUnique({ where: { id } });
+        if (!account) throw new Error("Seed demo account missing");
+        expect(isDemoAccount(account)).toBe(true);
+        expect(await compare(demoPassword, account.passwordHash)).toBe(true);
+      }
+      const administrator = await db.user.findUnique({ where: { id: "demo-user-admin" } });
+      if (!administrator) throw new Error("Historical Seed administrator missing");
+      expect(isDemoAccount(administrator)).toBe(false);
     } finally {
       if (originalDatabaseUrl === undefined) delete process.env.DATABASE_URL;
       else process.env.DATABASE_URL = originalDatabaseUrl;

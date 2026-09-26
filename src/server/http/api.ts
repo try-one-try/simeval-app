@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { auth } from "@/auth";
 import { userRepository } from "@/server/repositories/user-repository";
+import { isDemoAccount, isDemoRole } from "@/lib/demo-identity";
 import { AppError, assertRole, type Actor, type Role } from "@/domain/evaluation";
 export function parse<T>(schema: z.ZodType<T>, value: unknown): T {
   const result = schema.safeParse(value);
@@ -24,7 +25,7 @@ export async function apiActor(): Promise<Actor> {
   const session = await auth();
   if (!session?.user?.id) throw new AppError("UNAUTHENTICATED", "请先进入演示会话", 401);
   const user = await userRepository.findById(session.user.id);
-  if (!user) throw new AppError("UNAUTHENTICATED", "会话已失效，请重新进入", 401);
+  if (!user || !isDemoAccount(user) || !isDemoRole(user.role)) throw new AppError("UNAUTHENTICATED", "会话已失效，请重新进入", 401);
   return { id: user.id, role: user.role };
 }
 type ApiResult = { data: unknown; status?: number; meta?: Record<string, number> };

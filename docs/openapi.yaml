@@ -1,8 +1,8 @@
 openapi: "3.1.0"
 info:
   title: "SimEval HTTP API"
-  version: "0.4.0"
-  description: "合成数据与模拟执行。implemented 表示当前第一版可调用契约；planned 为未实现计划。\nx-target-* 标出已有接口的新原型目标，尚未改变实际请求或角色权限。\n2026-09-27 按双身份、自主配置、多任务、软删除、结论编辑和报告版本修订；未修改运行代码。\n"
+  version: "0.4.1"
+  description: "合成数据与模拟执行。implemented 表示当前第一版可调用契约；planned 为未实现计划。\nx-target-* 标出已有接口的新原型目标，请求目标尚未改变；双身份权限已落实。\n2026-09-27 按双身份、自主配置、多任务、软删除、结论编辑和报告版本修订；阶段 3 已接双身份会话门禁，旧 ADMIN 会话失效；请求字段不变。\n"
 jsonSchemaDialect: "https://json-schema.org/draft/2020-12/schema"
 tags:
   -
@@ -37,7 +37,6 @@ paths:
       x-roles:
         - "ENGINEER"
         - "REVIEWER"
-        - "ADMIN"
       parameters:
         -
           $ref: "#/components/parameters/DatasetId"
@@ -58,9 +57,6 @@ paths:
           $ref: "#/components/responses/Unprocessable"
         500:
           $ref: "#/components/responses/InternalError"
-      x-target-roles:
-        - "ENGINEER"
-        - "REVIEWER"
   "/api/evaluation-runs":
     get:
       tags:
@@ -71,7 +67,6 @@ paths:
       x-roles:
         - "ENGINEER"
         - "REVIEWER"
-        - "ADMIN"
       parameters:
         -
           $ref: "#/components/parameters/Page"
@@ -102,9 +97,6 @@ paths:
           $ref: "#/components/responses/Unprocessable"
         500:
           $ref: "#/components/responses/InternalError"
-      x-target-roles:
-        - "ENGINEER"
-        - "REVIEWER"
       x-target-changes: "过滤软删除，区分示例与新建任务，支持显式选择而非恢复最近任务。"
     post:
       tags:
@@ -114,7 +106,6 @@ paths:
       summary: "创建模拟评测任务"
       x-roles:
         - "ENGINEER"
-        - "ADMIN"
       parameters:
         -
           $ref: "#/components/parameters/IdempotencyKey"
@@ -151,8 +142,6 @@ paths:
           $ref: "#/components/responses/InternalError"
         503:
           $ref: "#/components/responses/ExternalServiceError"
-      x-target-roles:
-        - "ENGINEER"
       x-target-request-schema: "#/components/schemas/TargetCreateRunRequest"
       x-target-changes: "基线可选，目录兼容校验，成功率目标与配置快照；改造完成后更新实际契约。"
   "/api/evaluation-runs/{runId}":
@@ -165,7 +154,6 @@ paths:
       x-roles:
         - "ENGINEER"
         - "REVIEWER"
-        - "ADMIN"
       parameters:
         -
           $ref: "#/components/parameters/RunId"
@@ -186,9 +174,6 @@ paths:
           $ref: "#/components/responses/Unprocessable"
         500:
           $ref: "#/components/responses/InternalError"
-      x-target-roles:
-        - "ENGINEER"
-        - "REVIEWER"
     delete:
       tags:
         - "Evaluation"
@@ -230,7 +215,6 @@ paths:
       x-roles:
         - "ENGINEER"
         - "REVIEWER"
-        - "ADMIN"
       parameters:
         -
           $ref: "#/components/parameters/RunId"
@@ -251,9 +235,6 @@ paths:
           $ref: "#/components/responses/Unprocessable"
         500:
           $ref: "#/components/responses/InternalError"
-      x-target-roles:
-        - "ENGINEER"
-        - "REVIEWER"
   "/api/evaluation-runs/{runId}/sync":
     post:
       tags:
@@ -264,7 +245,6 @@ paths:
       x-roles:
         - "ENGINEER"
         - "REVIEWER"
-        - "ADMIN"
       description: "每次最多推进一段；满 2 秒排队转运行，满 12 秒运行转终态。无后台执行。并发只生成一组结果；所有 POST 须同源 Origin。"
       parameters:
         -
@@ -288,9 +268,6 @@ paths:
           $ref: "#/components/responses/InternalError"
         503:
           $ref: "#/components/responses/ExternalServiceError"
-      x-target-roles:
-        - "ENGINEER"
-        - "REVIEWER"
   "/api/evaluation-runs/{runId}/cancel":
     post:
       tags:
@@ -300,7 +277,6 @@ paths:
       summary: "取消尚未进入终态的任务"
       x-roles:
         - "ENGINEER"
-        - "ADMIN"
       parameters:
         -
           $ref: "#/components/parameters/RunId"
@@ -323,8 +299,6 @@ paths:
           $ref: "#/components/responses/Unprocessable"
         500:
           $ref: "#/components/responses/InternalError"
-      x-target-roles:
-        - "ENGINEER"
   "/api/evaluation-runs/{runId}/retry":
     post:
       tags:
@@ -334,7 +308,6 @@ paths:
       summary: "为失败任务创建新任务，原任务不覆盖"
       x-roles:
         - "ENGINEER"
-        - "ADMIN"
       parameters:
         -
           $ref: "#/components/parameters/RunId"
@@ -367,8 +340,6 @@ paths:
           $ref: "#/components/responses/InternalError"
         503:
           $ref: "#/components/responses/ExternalServiceError"
-      x-target-roles:
-        - "ENGINEER"
   "/api/comparisons":
     get:
       tags:
