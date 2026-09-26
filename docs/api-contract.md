@@ -115,8 +115,8 @@ Idempotency-Key: create-run-v24-001
   "datasetVersionId": "dataset_warehouse_v3",
   "benchmarkId": "benchmark_warehouse_pick",
   "baselineRunId": "run_baseline_v23",
-  "episodeCount": 500,
-  "simulationSeed": 42,
+  "episodeCount": 200,
+  "simulationSeed": 20260901,
   "acceptQualityWarning": true
 }
 
@@ -257,7 +257,7 @@ Content-Type: application/json
     "id": "run_candidate_v24", "projectId": "project_warehouse", "name": "v2.4 仓储抓取评测", "status": "QUEUED",
     "modelVersionId": "model_v24", "datasetVersionId": "dataset_warehouse_v3",
     "benchmarkId": "benchmark_warehouse_pick", "baselineRunId": "run_baseline_v23",
-    "retryOfRunId": null, "episodeCount": 500, "simulationSeed": 42,
+    "retryOfRunId": null, "episodeCount": 200, "simulationSeed": 20260901,
     "provider": "mock", "createdAt": "2026-09-23T10:00:00Z", "startedAt": null,
     "finishedAt": null, "errorCode": null, "errorMessage": null
   },
