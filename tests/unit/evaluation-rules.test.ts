@@ -39,11 +39,11 @@ describe("模拟 Provider", () => {
   const now=(ms:number)=>new Date(createdAt.getTime()+ms);
   it("按服务器时间推进一段状态，终态稳定", () => {
     const task={status:"QUEUED" as const,createdAt,mockFailure:false};
-    expect(provider.nextStatus(task,now(1999))).toBe("QUEUED");
-    expect(provider.nextStatus(task,now(2000))).toBe("RUNNING");
-    expect(provider.nextStatus({...task,status:"RUNNING"},now(11999))).toBe("RUNNING");
-    expect(provider.nextStatus({...task,status:"RUNNING"},now(12000))).toBe("SUCCEEDED");
-    expect(provider.nextStatus({...task,status:"RUNNING",mockFailure:true},now(12000))).toBe("FAILED");
+    expect(provider.nextStatus(task,now(999))).toBe("QUEUED");
+    expect(provider.nextStatus(task,now(1000))).toBe("RUNNING");
+    expect(provider.nextStatus({...task,status:"RUNNING"},now(3999))).toBe("RUNNING");
+    expect(provider.nextStatus({...task,status:"RUNNING"},now(4000))).toBe("SUCCEEDED");
+    expect(provider.nextStatus({...task,status:"RUNNING",mockFailure:true},now(4000))).toBe("FAILED");
     for(const status of ["SUCCEEDED","FAILED","CANCELLED"] as const) expect(provider.nextStatus({...task,status},now(99999))).toBe(status);
   });
   const snapshot: SimulationSnapshot = { algorithm:"mock-v2", modelId:"model", datasetId:"dataset", benchmarkId:"benchmark", success:81, collision:13, duration:11.8, intervention:5, difficulty:0, episodeCount:200, simulationSeed:20260901, scenarioKey:"occlusion", scenarioFraction:.25, successRule:"合成规则", metrics:[{id:"s",key:"success_rate"},{id:"c",key:"collision_rate"}] };

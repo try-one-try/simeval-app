@@ -3,6 +3,8 @@ import "server-only";
 import { createHash } from "node:crypto";
 import type { RunStatus } from "@/domain/evaluation";
 import type { SimulationSnapshot } from "@/domain/evaluation-catalog";
+// 演示时长集中配置，单位毫秒；以创建时间为起点，页面同步时才推进状态。
+export const MOCK_EXECUTION_TIMING = { startAfterMs: 1_000, finishAfterMs: 4_000 } as const;
 export type SimulationTask = { status: RunStatus; createdAt: Date; mockFailure: boolean };
 export type GeneratedMetric = { metricDefinitionId: string; key: string; scenarioKey: string; sampleCount: number; value: number };
 export interface EvaluationProvider {
@@ -12,8 +14,8 @@ export interface EvaluationProvider {
 export class MockEvaluationProvider implements EvaluationProvider {
   nextStatus(task: SimulationTask, now: Date): RunStatus {
     const elapsed = now.getTime() - task.createdAt.getTime();
-    if (task.status === "QUEUED" && elapsed >= 2000) return "RUNNING";
-    if (task.status === "RUNNING" && elapsed >= 12000) return task.mockFailure ? "FAILED" : "SUCCEEDED";
+    if (task.status === "QUEUED" && elapsed >= MOCK_EXECUTION_TIMING.startAfterMs) return "RUNNING";
+    if (task.status === "RUNNING" && elapsed >= MOCK_EXECUTION_TIMING.finishAfterMs) return task.mockFailure ? "FAILED" : "SUCCEEDED";
     return task.status;
   }
   results(s: SimulationSnapshot): GeneratedMetric[] {

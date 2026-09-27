@@ -5,7 +5,7 @@ import { AppError, assertRole, isActive, type Actor, type CreateRunInput } from 
 import type { RunData, QualityData, EvaluationOptions } from "@/lib/evaluation-dto";
 import { ACTIVE_TASK_LIMIT, benchmarks, models, metricCatalog, snapshotSchema } from "@/domain/evaluation-catalog";
 const readers = ["ENGINEER", "REVIEWER", "ADMIN"] as const;
-function runDto(run: StoredRun): RunData {
+export function runDto(run: StoredRun): RunData {
   return { id: run.id, name: run.name ?? `${run.modelVersion.name} ${run.modelVersion.version} 固定评测`,
     projectId: run.projectId, status: run.status, modelVersionId: run.modelVersionId, datasetVersionId: run.datasetVersionId,
     benchmarkId: run.benchmarkId, baselineRunId: run.baselineRunId, retryOfRunId: run.retryOfRunId,
@@ -16,7 +16,7 @@ function runDto(run: StoredRun): RunData {
     datasetVersion: run.datasetVersion.version, benchmarkName: run.benchmark.name, benchmarkVersion: run.benchmark.version,
     createdById: run.createdById, isDemoFixture: run.isDemoFixture,
     targetSuccessRate: run.targetSuccessRate === null ? null : Number(run.targetSuccessRate),
-    pendingReviewCount: run.anomalies.filter(sample => sample.status !== "RESOLVED").length,
+    pendingReviewCount: run.anomalies.filter(sample => sample.status !== "RESOLVED" || !!sample.draftConclusion).length,
     successRule: snapshotSchema.safeParse(run.configurationSnapshot).data?.successRule ?? benchmarks.find(b => b.id === run.benchmarkId)?.successRule ?? "历史评测口径",
     metrics: [...run.metricResults].sort((a,b) => metricCatalog.findIndex(m => m.key === a.metricDefinition.key) - metricCatalog.findIndex(m => m.key === b.metricDefinition.key)).map(metric => ({ key: metric.metricDefinition.key, name: metric.metricDefinition.name, unit: metric.metricDefinition.unit, scenarioKey: metric.scenarioKey, value: Number(metric.value), sampleCount: metric.sampleCount })) };
 }

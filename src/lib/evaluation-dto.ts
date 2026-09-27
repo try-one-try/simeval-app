@@ -1,5 +1,7 @@
 // 浏览器可用的数据契约；不包含 Prisma 对象、密钥或密码摘要。
 import type { RunStatus } from "@/domain/evaluation";
+// 任务选择页的首屏和翻页共用数量；接口默认分页仍由领域查询规则定义。
+export const TASK_SELECTION_PAGE_SIZE = 6;
 export type RunData = {
   id: string; name: string; projectId: string; status: RunStatus; modelVersionId: string;
   datasetVersionId: string; benchmarkId: string; baselineRunId: string | null; retryOfRunId: string | null;

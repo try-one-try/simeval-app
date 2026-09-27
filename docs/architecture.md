@@ -1,6 +1,6 @@
 # SimEval 架构设计
 
-**2026-09-27：双身份、自主配置、两步质量确认、独立模拟、多任务与软删除已接通。** 比较／复核／报告仍待后续切片。行为看[规格](../specs/002-quality-evaluation/spec.md)，规则矩阵与算法看[计划](../specs/002-quality-evaluation/plan.md)，HTTP 看 [OpenAPI](openapi.yaml)。
+**2026-09-27：双身份、自主配置、两步质量确认、独立模拟、多任务与软删除已接通。** 阶段 5 已接入比较、证据与结论编辑；报告待重新讨论。行为看[规格](../specs/002-quality-evaluation/spec.md)，规则矩阵与算法看[计划](../specs/002-quality-evaluation/plan.md)，比较与复核看[003规格](../specs/003-comparison-review/spec.md)，HTTP 看 [OpenAPI](openapi.yaml)。
 
 ## 1. 运行边界
 
@@ -55,15 +55,15 @@ flowchart LR
 
 ## 4. 已迁移与后续数据变化
 
-阶段 4 已追加 `202609270001_autonomous_evaluation`；复核／报告仍待各自切片迁移。不 reset，不覆盖已有用户任务。
+阶段 4 追加 `202609270001_autonomous_evaluation`，阶段 5 追加 `202609270002_comparison_review`。不 reset，不覆盖已有用户任务。
 
 | 对象 | 目标变化 |
 |---|---|
 | EvaluationRun | 新建 name 必填、baselineRunId 可空；已加 targetSuccessRate（可空 0.8／0.85）、configurationSnapshot、deletedAt／deletedById |
-| 模型／数据／Benchmark 目录 | 兼容矩阵与模拟参数统一在 domain/evaluation-catalog.ts；prisma/catalog.ts 增量补目录，完整 Seed 调用它，db:catalog 不重置故事 |
-| AnomalySample | 拟分开 draftConclusion 与已确认 conclusion，保存修改人／时间、confirmedById／confirmedAt 和 confirmedRevision；现有 version 用于所有编辑防覆盖 |
+| 模型／数据／Benchmark 目录 | 兼容矩阵与模拟参数统一在 domain/evaluation-catalog.ts；prisma/catalog.ts 只补缺失目录和历史合成基线，完整 Seed 调用它，db:catalog 不覆盖已有记录 |
+| AnomalySample | 已分开 draftConclusion 与已确认 conclusion，保存修改人／时间、confirmedById／confirmedAt 和 confirmedRevision；现有 version 用于所有编辑防覆盖 |
 | ReviewRecord | 只追加每次草稿／确认／修改的内容、操作者、时间与来源版本，不要求人工分类 |
-| AIReport | 输入快照保存指标、证据和 sourceReviewVersions（样本 ID → 确认版本）；拟加 isStale／staleAt。过时报告保留原确认历史，当前入口提示重生成 |
+| AIReport | 输入快照保存指标、证据和 sourceReviewVersions（样本 ID → 确认版本）；已加 isStale／staleAt；生成与确认尚未实现。过时报告保留原确认历史，当前入口提示重生成 |
 
 草稿保存只增加编辑 version；最终结论内容改变才增加 confirmedRevision 并令旧报告过时。报告确认时再次核对来源版本，避免“生成时有效、确认时已过期”。
 
@@ -71,14 +71,22 @@ flowchart LR
 
 ## 5. 当前可运行行为与写入保护
 
-现有十个操作包含目录、质量、创建／列表／详情、状态、同步、取消、重试和软删除。创建保存 mock-v2 参数快照；结果独立于基线，保留四项指标和两条预置证据片段。模型与难度改变指标，Seed／Episode 产生确定性偏移；目标仅判断达标，不改变结果。
+质量／评测十个操作包含目录、质量、创建／列表／详情、状态、同步、取消、重试和软删除。创建保存 mock-v2 参数快照；结果独立于基线，保留四项指标和两条预置证据片段。模型与难度改变指标，Seed／Episode 产生确定性偏移；目标仅判断达标，不改变结果。
 
-- GET 只读；POST sync 按服务器时间每次推进一段，约 2 秒运行、12 秒完成，没有后台执行。运行中 progress 为 null。
+- GET 只读；POST sync 按服务器时间每次推进一段，创建后满 1 秒可运行、满 4 秒可完成，没有后台执行。运行中 progress 为 null。
 - 成功的指标、异常、终态和审计同事务提交，重复同步不重复写。
 - 取消仅允许 QUEUED／RUNNING；条件更新和事务处理完成竞争。失败重试新建任务并保留 retryOfRunId。
 - 创建／重试按用户＋操作＋幂等键和请求摘要识别；同键不同内容拒绝。并发冲突有限重试。
 - 创建先锁 User 行，查幂等再查三个活跃任务容量；取消／终态释放名额。
 - 软删除过滤普通列表和详情；指标及已有外键引用保留，重复删除不重复审计。
-- 后续复核使用 expectedVersion 防覆盖；本阶段不把结论编辑说成已实现。
+- 结论编辑使用 expectedVersion 防覆盖，事务统一保存当前内容、历史、审计与旧报告过时标记。
 
 Schema 改动后生成 Client、应用迁移、重启旧服务，再验网页。新版本相关测试与手工验收看 [Quickstart](../specs/002-quality-evaluation/quickstart.md)；旧测试通过不代表新设计已实现。
+
+### 阶段 5 的调用与事务
+
+comparison-view / anomaly-list / sample-detail / review-editor → HTTP 统一边界 → comparison-review 应用服务 → 领域规则／仓储 → MySQL。页面首读直接调用同一应用服务；DTO 只发送公开证据、人物姓名与版本。
+
+复核先锁 EvaluationRun，复查成功／未隐藏及权限；再检查 AnomalySample.version 并条件更新。当前内容、ReviewRecord、旧报告过时标记、AuditLog 同事务提交。两个请求拿同一版本时一个成功、另一个 409；前端保留后者输入。任务删除也锁同一任务，防止隐藏后继续写复核。
+
+确认修订号只追踪最终文本变化；编辑版本追踪全部保存。已有 RESOLVED 故事在迁移中补确认修订 1 及历史确认人，旧内容和旧分类／回补关系保留。完整 Seed 初始化新环境时重建固定示例确认字段；本轮开发库只追加迁移，没有重跑完整 Seed。

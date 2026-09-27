@@ -4,23 +4,24 @@
 
 ## 产品与真实状态
 
-**2026-09-27：新原型已认可；双身份入口已接通，待负责人验收。** 目标流程是：
+**2026-09-27：阶段 3–4 已验收；阶段 5 模型比较与结论复核已接通，待负责人验收。** 目标流程是：
 
 选择模型／数据／Benchmark → 确认质量 → 创建并模拟执行 → 查看结果／按需比较基线 → 异常复核 → 生成并确认报告。
 
 产品只有算法工程师和评测人员，预设登录二选一、无注册；工程师管理本人任务和草稿，评测人员确认结论／报告。除创建外先选择任务，后续按钮延续当前任务；支持多任务、取消／重试／软删除。首次没有基线也应能评测；不做独立回补管理或人工分类步骤。
 
-**当前已实现双身份登录／切换、角色导航、自主配置与质量两步、无基线模拟、多任务单选／上下文延续、所选任务总览、取消／重试／软删除。** 十个业务 HTTP 操作已可调用；比较、复核、AI 报告只接任务入口，业务将在后续切片实现。合成数据、预置报告与模拟执行明确标注，不运行真实仿真或训练。
+**当前已实现双身份登录／切换、角色导航、自主配置与质量两步、无基线模拟、多任务单选／上下文延续、所选任务总览、取消／重试／软删除。** 同口径比较、异常证据下钻及自由结论草稿／确认／修改历史也已实现，共十四个业务 HTTP 操作。AI 报告生成／确认尚未开放，方案待重新讨论。合成数据、预置报告与模拟执行明确标注，不运行真实仿真或训练。
 
-本轮身份适配通过 lint、类型、60 项单元测试、7 项独立 MySQL 集成测试和生产构建；代理实际检查登录／双向切换、权限、刷新／退出、375px 与 Escape／焦点。负责人验收及后续切片仍待完成。目标是在几分钟内看懂“总体提升但遮挡回退 → 两条证据原因不同 → 人工确认”，部署与首次访问计时仍待完成。
+质量检查、实际验证证据与待验步骤见各规格 quickstart。目标是在几分钟内看懂“总体提升但遮挡回退 → 日志证据 → 人工确认”。部署与首次访问计时仍待完成。
 
 ## 面试官从哪里看
 
 | 内容 | 入口 |
 |---|---|
 | 产品与交互 | [Figma 原型](https://www.figma.com/design/Y2ZIhN1yuuXBeieGkxtnsH/simeval?node-id=43-2)，预设交互不等于业务实现 |
-| 当前实施规格 | [需求](specs/002-quality-evaluation/spec.md) → [计划](specs/002-quality-evaluation/plan.md) → [任务](specs/002-quality-evaluation/tasks.md) → [验收](specs/002-quality-evaluation/quickstart.md) |
-| 架构与数据 | [架构设计](docs/architecture.md)，区分现有行为与待迁移方案 |
+| 评测与任务规格 | [需求](specs/002-quality-evaluation/spec.md) → [计划](specs/002-quality-evaluation/plan.md) → [任务](specs/002-quality-evaluation/tasks.md) → [验收](specs/002-quality-evaluation/quickstart.md) |
+| 比较与复核规格 | [需求](specs/003-comparison-review/spec.md) → [计划](specs/003-comparison-review/plan.md) → [任务](specs/003-comparison-review/tasks.md) → [验收](specs/003-comparison-review/quickstart.md) |
+| 架构与数据 | [架构设计](docs/architecture.md)，分层、事务与迁移说明 |
 | API | [OpenAPI](docs/openapi.yaml)、[调用与错误示例](docs/api-contract.md)，区分 implemented／planned／待改造 |
 | 工程基础证据 | [基础规格](specs/001-demo-foundation/spec.md)、[原任务](specs/001-demo-foundation/tasks.md) |
 | 开发规范 | [项目原则](.specify/memory/constitution.md)、[代理规则](AGENTS.md) |
@@ -56,7 +57,7 @@ npm run dev
 
 **平时再次打开**：在 `simeval-app/` 中运行 `npm run dev`，看到 `Ready` 后访问 `http://localhost:3000`；结束时在该终端按 `Ctrl+C`。若端口 3000 已有本项目服务，直接打开网页即可，不要再启动第二个服务。改动依赖锁文件后才需要重新运行 `npm ci`；拉取仓库新增迁移时运行 `db:deploy`，自己修改 Schema 时运行 `db:migrate`，需要重建演示故事时运行 `db:seed`。Schema 变化后另运行 `db:generate` 并重启旧开发服务。
 
-打开 `/login` 选择身份：工程师默认进入创建，评测人员进入异常复核的任务选择页。右上角可切换；角色导航和实际会话同步变化。创建默认空选，演示配置只填表；总览显示所选任务；阶段 4 更新已有环境：停止旧 dev，依次运行 `npm run db:generate`、`npm run db:deploy`、`npm run db:catalog`、`npm run dev`；新环境完整 Seed 已包含目录。具体检查看 [当前验收步骤](specs/002-quality-evaluation/quickstart.md)。
+打开 `/login` 选择身份：工程师默认进入创建，评测人员进入异常复核的任务选择页。右上角可切换；角色导航和实际会话同步变化。创建默认空选，演示配置只填表；总览显示所选任务；阶段 4 更新已有环境：停止旧 dev，依次运行 `npm run db:generate`、`npm run db:deploy`、`npm run db:catalog`、`npm run dev`；新环境完整 Seed 已包含目录。评测检查看 [阶段4验收](specs/002-quality-evaluation/quickstart.md)，比较与复核看 [阶段5验收](specs/003-comparison-review/quickstart.md)。
 
 生产预览先停止开发服务，再运行 `npm run build`、`npm run start`；仅对可信 localhost 在本地配置 `AUTH_TRUST_HOST="true"`，普通开发无需此项。MockEvaluationProvider 已接入，AI Provider 后续实现。
 

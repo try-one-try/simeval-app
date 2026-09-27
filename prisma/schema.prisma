@@ -72,6 +72,8 @@ model User {
   createdAt      DateTime        @default(now())
   createdRuns    EvaluationRun[] @relation("RunCreator")
   assignedSamples AnomalySample[] @relation("SampleAssignee")
+  draftSamples AnomalySample[] @relation("DraftEditor")
+  confirmedSamples AnomalySample[] @relation("SampleConfirmer")
   reviews        ReviewRecord[]  @relation("Reviewer")
   createdBackfills BackfillTask[] @relation("BackfillCreator")
   assignedBackfills BackfillTask[] @relation("BackfillAssignee")
@@ -229,16 +231,27 @@ model AnomalySample {
   mediaPath      String?        @db.VarChar(255)
   logExcerpt     String?        @db.Text
   metadata       Json?
+  // 草稿与最终结论隔离；version 防覆盖，confirmedRevision 标记最终内容变化。
+  draftConclusion String?       @db.Text
+  draftUpdatedById String?      @db.VarChar(64)
+  draftUpdatedAt DateTime?
+  confirmedById String?         @db.VarChar(64)
+  confirmedAt DateTime?
+  confirmedRevision Int         @default(0)
   conclusion     String?        @db.Text
   version        Int            @default(1)
   resolvedAt     DateTime?
   run            EvaluationRun  @relation(fields: [runId], references: [id])
   assignee       User?          @relation("SampleAssignee", fields: [assigneeId], references: [id])
+  draftUpdatedBy User? @relation("DraftEditor", fields: [draftUpdatedById], references: [id])
+  confirmedBy User? @relation("SampleConfirmer", fields: [confirmedById], references: [id])
   reviews        ReviewRecord[]
   backfills      BackfillTask[]
   @@unique([runId, sampleNumber])
   @@index([runId, metricKey, scenarioKey, status])
   @@index([assigneeId, status])
+  @@index([draftUpdatedById])
+  @@index([confirmedById])
 }
 
 model ReviewRecord {
@@ -250,6 +263,10 @@ model ReviewRecord {
   category        ReviewCategory?
   conclusion      String?         @db.Text
   reopenReason    String?         @db.Text
+  mode String? @db.VarChar(16)
+  fromVersion Int?
+  toVersion Int?
+  confirmedRevision Int?
   createdAt       DateTime        @default(now())
   anomalySample   AnomalySample   @relation(fields: [anomalySampleId], references: [id])
   reviewer        User            @relation("Reviewer", fields: [reviewerId], references: [id])
@@ -277,6 +294,8 @@ model AIReport {
   runId           String         @db.VarChar(64)
   baselineRunId   String?        @db.VarChar(64)
   status          ReportStatus
+  isStale         Boolean        @default(false)
+  staleAt         DateTime?
   inputSnapshot   Json
   output          Json
   provider        String         @db.VarChar(80)

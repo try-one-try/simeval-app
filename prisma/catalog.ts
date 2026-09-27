@@ -1,4 +1,4 @@
-// 增量目录写入只补模型、数据与基准，不修改用户创建的任务或历史故事。
+// 增量写入补目录与历史合成基线；稳定键只创建缺项，不改既有任务、指标或复核。
 import type { PrismaClient } from "../src/generated/prisma/client";
 import { PROJECT_ID, models, datasets, benchmarks, metricCatalog, metricId } from "../src/domain/evaluation-catalog";
 export async function seedCatalog(db: PrismaClient) {
@@ -22,6 +22,28 @@ export async function seedCatalog(db: PrismaClient) {
       for (const metric of metricCatalog) {
         const { suffix, ...data } = metric;
         await tx.metricDefinition.upsert({ where: { id: metricId(id, suffix) }, create: { ...data, id: metricId(id, suffix), benchmarkId: id }, update: {} });
+      }
+    }
+    // 历史结果与 v2.3 使用相同数据／基准／200 Episode／Seed；不是用户新创建的评测。
+    for (const [index, modelId] of ["demo-model-v21", "demo-model-v22"].entries()) {
+      const model = models.find(item => item.id === modelId)!;
+      const runId = modelId.replace("model", "run");
+      const at = new Date(Date.UTC(2026, 7, 30 + index, 9));
+      const finishedAt = new Date(at.getTime() + 8 * 60_000);
+      await tx.evaluationRun.upsert({
+        where: { id: runId },
+        create: { id: runId, name: "PickPlace " + model.version + " 历史合成示例", projectId: PROJECT_ID, modelVersionId: model.id,
+          datasetVersionId: "demo-dataset-scenes-v3", benchmarkId: "demo-benchmark-v1",
+          status: "SUCCEEDED", createdById: "demo-user-engineer", provider: "MockEvaluationProvider",
+          episodeCount: 200, simulationSeed: 20260901, isDemoFixture: true,
+          createdAt: at, startedAt: at, finishedAt, resultsGeneratedAt: finishedAt },
+        update: {},
+      });
+      for (const metric of metricCatalog) {
+        const data = { runId, metricDefinitionId: metricId("demo-benchmark-v1", metric.suffix),
+          scenarioKey: metric.suffix === "collision" ? "occlusion" : "__overall__",
+          sampleCount: metric.suffix === "collision" ? 50 : 200, value: model[metric.suffix] };
+        await tx.metricResult.upsert({ where: { id: runId + "-" + metric.suffix }, create: { id: runId + "-" + metric.suffix, ...data }, update: {} });
       }
     }
   });

@@ -5,7 +5,7 @@ import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { Actor } from "@/domain/evaluation";
 import { isActive } from "@/domain/evaluation";
-import type { RunData } from "@/lib/evaluation-dto";
+import { TASK_SELECTION_PAGE_SIZE, type RunData } from "@/lib/evaluation-dto";
 import { apiRequest, ClientError, errorText } from "@/lib/api-client";
 const labels = { QUEUED: "排队中", RUNNING: "运行中", SUCCEEDED: "已完成", FAILED: "失败", CANCELLED: "已取消" };
 export type TaskModule = "evaluations" | "comparisons" | "anomalies" | "reports" | "overview";
@@ -16,6 +16,7 @@ export function TaskSelector({ initial, actor, module }: { initial: { data: RunD
   const [list, setList] = useState(initial);
   const [selectedId, setSelectedId] = useState("");
   const [page, setPage] = useState(1);
+  const totalPages = Math.max(1, Math.ceil(list.total / TASK_SELECTION_PAGE_SIZE));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const dialog = useRef<HTMLDialogElement>(null);
@@ -26,7 +27,7 @@ export function TaskSelector({ initial, actor, module }: { initial: { data: RunD
   const canDelete = selected && actor.role === "ENGINEER" && actor.id === selected.createdById && !selected.isDemoFixture && !isActive(selected.status);
   async function reload(nextPage: number): Promise<void> {
     // 分页读取含 meta 的统一响应，删除后重新查询，避免用旧列表猜测数据库状态。
-    const response = await fetch("/api/evaluation-runs?page=" + nextPage + "&pageSize=20", { cache: "no-store" });
+    const response = await fetch("/api/evaluation-runs?page=" + nextPage + "&pageSize=" + TASK_SELECTION_PAGE_SIZE, { cache: "no-store" });
     const body: { data: RunData[]; meta: { total: number }; error?: { message: string; requestId?: string } } = await response.json();
     if (!response.ok) throw new ClientError(body.error?.message ?? "任务读取失败", response.status, body.error?.requestId);
     if (!body.data.length && nextPage > 1) return reload(nextPage - 1);
@@ -56,7 +57,10 @@ export function TaskSelector({ initial, actor, module }: { initial: { data: RunD
       </label>; })}
     </fieldset>
     {!list.data.length && <p className="task-list-empty">暂无任务。{actor.role === "ENGINEER" ? "可以先创建评测。" : "等待算法工程师创建评测。"}</p>}
-    <p className="fine-print">共 {list.total} 条 · 第 {page} 页{list.total > 20 && <>　<button className="text-action" disabled={busy || page === 1} onClick={() => changePage(page - 1)}>上一页</button>　<button className="text-action" disabled={busy || page * 20 >= list.total} onClick={() => changePage(page + 1)}>下一页</button></>}</p>
+    <nav className="task-pagination" aria-label="任务列表分页">
+      <p className="fine-print" aria-live="polite">共 {list.total} 条 · 第 {page} / {totalPages} 页 · 每页 {TASK_SELECTION_PAGE_SIZE} 条</p>
+      {totalPages > 1 && <div className="pagination-actions"><button className="text-action" disabled={busy || page === 1} onClick={() => changePage(page - 1)}>上一页</button><button className="text-action" disabled={busy || page === totalPages} onClick={() => changePage(page + 1)}>下一页</button></div>}
+    </nav>
     <div className="selection-toolbar"><p className="selection-summary" aria-live="polite">{selected ? "当前任务：" + selected.name : "尚未选择任务"}</p>
     {selected && resultsOnly && selected.status !== "SUCCEEDED" && <Link className="inline-link" href={"/evaluations/" + selected.id}>查看当前任务状态 ↗</Link>}
     {error && <p className="request-error" role="alert">{error}</p>}

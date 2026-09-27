@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: SimEval HTTP API
-  version: 0.5.0
-  description: 合成数据与模拟执行。implemented 为已可调用操作，planned 为后续比较、复核和报告。自主配置、无基线执行、配置快照、三任务容量和软删除已实现；仅工程师和评测人员两种预设会话。
+  version: 0.6.0
+  description: 合成数据与模拟执行。质量／评测／比较／异常复核14项操作已实现；报告、指派／重开为planned，报告方案待重新讨论。
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 tags:
 - name: Catalog
@@ -229,7 +229,7 @@ paths:
       x-roles:
       - ENGINEER
       - REVIEWER
-      description: 每次最多推进一段；满 2 秒排队转运行，满 12 秒运行转终态。无后台执行。并发只生成一组结果；所有 POST 须同源 Origin。
+      description: 每次最多推进一段；创建后满 1 秒排队转运行、满 4 秒运行转终态。无后台执行。并发只生成一组结果；所有 POST 须同源 Origin。
       parameters:
       - $ref: '#/components/parameters/RunId'
       responses:
@@ -325,25 +325,27 @@ paths:
       tags:
       - Comparison
       operationId: compareEvaluationRuns
-      x-implementation-status: planned
+      x-implementation-status: implemented
       summary: 比较两个已成功任务的同口径指标
       x-roles:
       - ENGINEER
       parameters:
       - name: baselineRunId
         in: query
-        required: true
+        required: false
         schema:
-          type: string
+          $ref: '#/components/schemas/ResourceId'
       - name: candidateRunId
         in: query
         required: true
         schema:
-          type: string
+          $ref: '#/components/schemas/ResourceId'
       - name: scenarioKey
         in: query
         schema:
           type: string
+          minLength: 1
+          maxLength: 120
       responses:
         200:
           description: 指标差值与证据计数
@@ -357,12 +359,19 @@ paths:
           $ref: '#/components/responses/NotFound'
         422:
           $ref: '#/components/responses/Unprocessable'
+        403:
+          $ref: '#/components/responses/Forbidden'
+        409:
+          $ref: '#/components/responses/Conflict'
+        500:
+          $ref: '#/components/responses/InternalError'
+      description: ENGINEER可读；不传baselineRunId只返回当前结果。网页首开另沿用任务原基线；显式取消比较不改变数据库。要求同项目／数据／Benchmark／Episode／Seed、不同模型且两侧成功；指标单位、方向或样本数不一致时NOT_COMPARABLE。
   /api/anomaly-samples:
     get:
       tags:
       - Anomaly
       operationId: listAnomalySamples
-      x-implementation-status: planned
+      x-implementation-status: implemented
       summary: 筛选异常样本
       x-roles:
       - ENGINEER
@@ -379,19 +388,26 @@ paths:
         in: query
         schema:
           type: string
+          minLength: 1
+          maxLength: 120
       - name: metricKey
         in: query
         description: 从对比页下钻时保留的指标筛选
         schema:
           type: string
+          minLength: 1
+          maxLength: 120
       - name: status
         in: query
         schema:
           $ref: '#/components/schemas/SampleStatus'
-      - name: assigneeId
+      - name: reviewState
         in: query
         schema:
           type: string
+          enum:
+          - pending
+          - confirmed
       responses:
         200:
           description: 样本列表
@@ -403,19 +419,32 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         422:
           $ref: '#/components/responses/Unprocessable'
-      description: 必须明确 runId；列表属于选定成功任务，待复核注明需评测人员复核。
+        403:
+          $ref: '#/components/responses/Forbidden'
+        404:
+          $ref: '#/components/responses/NotFound'
+        409:
+          $ref: '#/components/responses/Conflict'
+        500:
+          $ref: '#/components/responses/InternalError'
+      description: runId必填，成功且未隐藏任务。status与reviewState同时传入时取交集；按sampleNumber、ID升序。
   /api/anomaly-samples/{sampleId}:
     get:
       tags:
       - Anomaly
       operationId: getAnomalySample
-      x-implementation-status: planned
+      x-implementation-status: implemented
       summary: 获取样本证据、当前复核与历史
       x-roles:
       - ENGINEER
       - REVIEWER
       parameters:
       - $ref: '#/components/parameters/SampleId'
+      - name: runId
+        in: query
+        description: 可选父任务校验；不匹配返回404。
+        schema:
+          $ref: '#/components/schemas/ResourceId'
       responses:
         200:
           description: 样本详情
@@ -427,6 +456,14 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         404:
           $ref: '#/components/responses/NotFound'
+        403:
+          $ref: '#/components/responses/Forbidden'
+        409:
+          $ref: '#/components/responses/Conflict'
+        422:
+          $ref: '#/components/responses/Unprocessable'
+        500:
+          $ref: '#/components/responses/InternalError'
   /api/anomaly-samples/{sampleId}/assignment:
     patch:
       tags:
@@ -466,12 +503,12 @@ paths:
       tags:
       - Anomaly
       operationId: reviewAnomalySample
-      x-implementation-status: planned
+      x-implementation-status: implemented
       summary: 保存草稿，或由评测人员确认／修改最终结论
       x-roles:
       - ENGINEER
       - REVIEWER
-      description: mode=draft 两身份可用，不覆盖已确认结论；mode=confirm 仅 REVIEWER。expectedVersion 防覆盖，历史与审计一起保存；最终内容变化使旧报告过时。
+      description: 同源写入；工程师仅本人任务draft，REVIEWER可draft/confirm。expectedVersion从1开始；冲突409不覆盖。编辑版本每次保存增加，最终文本变化才增加confirmedRevision及标记关联旧报告过时；相同文本确认不增加修订号。任务被隐藏后拒绝写入。
       parameters:
       - $ref: '#/components/parameters/SampleId'
       requestBody:
@@ -497,6 +534,8 @@ paths:
           $ref: '#/components/responses/Conflict'
         422:
           $ref: '#/components/responses/Unprocessable'
+        500:
+          $ref: '#/components/responses/InternalError'
   /api/anomaly-samples/{sampleId}/reopen:
     post:
       tags:
@@ -661,8 +700,7 @@ components:
       type: apiKey
       in: cookie
       name: authjs.session-token
-      description: Auth.js Session Cookie；生产环境可能有 Secure 前缀，开发为 authjs.session-token，HTTPS 由 Auth.js 使用
-        Secure 前缀。
+      description: Auth.js Session Cookie；生产环境可能有 Secure 前缀，开发为 authjs.session-token，HTTPS 由 Auth.js 使用 Secure 前缀。
   parameters:
     DatasetId:
       name: datasetId
@@ -1163,60 +1201,7 @@ components:
       - meta
       properties:
         data:
-          type: object
-          required:
-          - baselineRunId
-          - candidateRunId
-          - metrics
-          properties:
-            baselineRunId:
-              type: string
-            candidateRunId:
-              type: string
-            metrics:
-              type: array
-              items:
-                type: object
-                required:
-                - metricKey
-                - unit
-                - direction
-                - baselineValue
-                - candidateValue
-                - delta
-                - verdict
-                - evidenceCount
-                properties:
-                  metricKey:
-                    type: string
-                  scenarioKey:
-                    type:
-                    - string
-                    - 'null'
-                  unit:
-                    type: string
-                    example: '%'
-                  direction:
-                    type: string
-                    enum:
-                    - HIGHER_IS_BETTER
-                    - LOWER_IS_BETTER
-                  baselineValue:
-                    type: number
-                  candidateValue:
-                    type: number
-                  delta:
-                    type: number
-                    description: 候选值减基线值
-                  verdict:
-                    type: string
-                    enum:
-                    - IMPROVEMENT
-                    - REGRESSION
-                    - UNCHANGED
-                  evidenceCount:
-                    type: integer
-                    minimum: 0
+          $ref: '#/components/schemas/ComparisonData'
         meta:
           $ref: '#/components/schemas/RequestMeta'
     Sample:
@@ -1226,10 +1211,21 @@ components:
       - runId
       - sampleNumber
       - scenarioKey
-      - anomalyType
       - metricKey
+      - anomalyType
+      - title
       - status
       - version
+      - logExcerpt
+      - mediaPath
+      - conclusion
+      - draftConclusion
+      - draftUpdatedBy
+      - confirmedBy
+      - draftUpdatedAt
+      - confirmedAt
+      - confirmedRevision
+      - pendingReview
       properties:
         id:
           type: string
@@ -1237,16 +1233,24 @@ components:
           type: string
         sampleNumber:
           type: string
-          example: sample_017
         scenarioKey:
-          type: string
-        anomalyType:
           type: string
         metricKey:
           type: string
+        anomalyType:
+          type: string
+        title:
+          type: string
         status:
           $ref: '#/components/schemas/SampleStatus'
-        assigneeId:
+        version:
+          type: integer
+          minimum: 1
+        logExcerpt:
+          type:
+          - string
+          - 'null'
+        mediaPath:
           type:
           - string
           - 'null'
@@ -1254,40 +1258,19 @@ components:
           type:
           - string
           - 'null'
-          description: 当前已确认结论；未确认时为 null，草稿另存
-        resolvedAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        mediaPath:
-          type:
-          - string
-          - 'null'
-        logExcerpt:
-          type:
-          - string
-          - 'null'
-        version:
-          type: integer
-          minimum: 0
         draftConclusion:
           type:
           - string
           - 'null'
-        draftUpdatedById:
-          type:
-          - string
-          - 'null'
+        draftUpdatedBy:
+          $ref: '#/components/schemas/ReviewPerson'
+        confirmedBy:
+          $ref: '#/components/schemas/ReviewPerson'
         draftUpdatedAt:
           type:
           - string
           - 'null'
           format: date-time
-        confirmedById:
-          type:
-          - string
-          - 'null'
         confirmedAt:
           type:
           - string
@@ -1296,54 +1279,28 @@ components:
         confirmedRevision:
           type: integer
           minimum: 0
-          description: 仅最终确认内容改变时增加；草稿编辑只增加 version
+        pendingReview:
+          type: boolean
+          description: 未确认，或有未确认的新草稿。
     SampleDetail:
-      allOf:
-      - $ref: '#/components/schemas/Sample'
-      - type: object
-        required:
-        - reviewHistory
-        properties:
-          reviewHistory:
-            type: array
-            items:
-              type: object
-              required:
-              - reviewerId
-              - fromStatus
-              - toStatus
-              - createdAt
-              - mode
-              - conclusion
-              - sourceVersion
-              properties:
-                reviewerId:
-                  type: string
-                fromStatus:
-                  $ref: '#/components/schemas/SampleStatus'
-                toStatus:
-                  $ref: '#/components/schemas/SampleStatus'
-                conclusion:
-                  type:
-                  - string
-                  - 'null'
-                reopenReason:
-                  type:
-                  - string
-                  - 'null'
-                createdAt:
-                  type: string
-                  format: date-time
-                mode:
-                  type: string
-                  enum:
-                  - draft
-                  - confirm
-                  - modify
-                  - reopen
-                sourceVersion:
-                  type: integer
-                  minimum: 0
+      type: object
+      required:
+      - sample
+      - run
+      - history
+      - staleReportCount
+      properties:
+        sample:
+          $ref: '#/components/schemas/Sample'
+        run:
+          $ref: '#/components/schemas/Run'
+        history:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewHistory'
+        staleReportCount:
+          type: integer
+          minimum: 0
     SampleEnvelope:
       type: object
       required:
@@ -1399,7 +1356,7 @@ components:
           description: confirm 仅评测人员；再次确认修改已有结论
         expectedVersion:
           type: integer
-          minimum: 0
+          minimum: 1
     ReopenSampleRequest:
       type: object
       additionalProperties: false
@@ -1422,12 +1379,7 @@ components:
       - meta
       properties:
         data:
-          type: object
-          required:
-          - sample
-          properties:
-            sample:
-              $ref: '#/components/schemas/Sample'
+          $ref: '#/components/schemas/SampleDetail'
         meta:
           $ref: '#/components/schemas/RequestMeta'
     CreateReportRequest:
@@ -1681,3 +1633,166 @@ components:
               format: date-time
         meta:
           $ref: '#/components/schemas/RequestMeta'
+    ReviewPerson:
+      type:
+      - object
+      - 'null'
+      required:
+      - id
+      - name
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+    ComparisonMetric:
+      type: object
+      required:
+      - key
+      - name
+      - unit
+      - direction
+      - scenarioKey
+      - candidateValue
+      - baselineValue
+      - candidateSampleCount
+      - baselineSampleCount
+      - delta
+      - deltaUnit
+      - verdict
+      - reason
+      - evidenceCount
+      properties:
+        key:
+          type: string
+        name:
+          type: string
+        unit:
+          type: string
+        direction:
+          type: string
+          enum:
+          - HIGHER_IS_BETTER
+          - LOWER_IS_BETTER
+        scenarioKey:
+          type: string
+          description: 总体使用__overall__；不映射null。
+        candidateValue:
+          type:
+          - number
+          - 'null'
+        baselineValue:
+          type:
+          - number
+          - 'null'
+        candidateSampleCount:
+          type:
+          - integer
+          - 'null'
+        baselineSampleCount:
+          type:
+          - integer
+          - 'null'
+        delta:
+          type:
+          - number
+          - 'null'
+          description: 候选减基线；不可比或无基线为null。
+        deltaUnit:
+          type: string
+          description: 百分比差用pp，其他沿用指标单位。
+        verdict:
+          type: string
+          enum:
+          - IMPROVEMENT
+          - REGRESSION
+          - UNCHANGED
+          - NOT_COMPARABLE
+          - CURRENT_ONLY
+        reason:
+          type:
+          - string
+          - 'null'
+        evidenceCount:
+          type: integer
+          minimum: 0
+    ComparisonData:
+      type: object
+      required:
+      - candidate
+      - baseline
+      - baselines
+      - metrics
+      - anomalyCount
+      - pendingReviewCount
+      properties:
+        candidate:
+          $ref: '#/components/schemas/Run'
+        baseline:
+          anyOf:
+          - $ref: '#/components/schemas/Run'
+          - type: 'null'
+        baselines:
+          type: array
+          items:
+            $ref: '#/components/schemas/Run'
+        metrics:
+          type: array
+          items:
+            $ref: '#/components/schemas/ComparisonMetric'
+        anomalyCount:
+          type: integer
+        pendingReviewCount:
+          type: integer
+    ReviewHistory:
+      type: object
+      required:
+      - id
+      - mode
+      - conclusion
+      - actor
+      - createdAt
+      - fromVersion
+      - toVersion
+      - confirmedRevision
+      properties:
+        id:
+          type: string
+        mode:
+          type: string
+          enum:
+          - draft
+          - confirm
+          - legacy
+        conclusion:
+          type:
+          - string
+          - 'null'
+        actor:
+          type: object
+          required:
+          - id
+          - name
+          - role
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            role:
+              type: string
+        createdAt:
+          type: string
+          format: date-time
+        fromVersion:
+          type:
+          - integer
+          - 'null'
+        toVersion:
+          type:
+          - integer
+          - 'null'
+        confirmedRevision:
+          type:
+          - integer
+          - 'null'

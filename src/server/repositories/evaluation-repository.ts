@@ -4,10 +4,10 @@ import { createHash, randomUUID } from "node:crypto";
 import { getDb } from "@/server/db";
 import { Prisma } from "@/generated/prisma/client";
 import { AppError, assertRole, assertQuality, assertConfiguration, assertMutable, type Actor, type CreateRunInput } from "@/domain/evaluation";
-import { evaluationProvider } from "@/server/providers/evaluation-provider";
+import { evaluationProvider, MOCK_EXECUTION_TIMING } from "@/server/providers/evaluation-provider";
 import { ACTIVE_TASK_LIMIT, configurationProfile, snapshotSchema, type SimulationSnapshot } from "@/domain/evaluation-catalog";
 type Tx = Prisma.TransactionClient;
-const includeRun = { modelVersion: true, datasetVersion: true, benchmark: true, metricResults: { include: { metricDefinition: true } }, anomalies: { select: { status: true } }, _count: { select: { anomalies: true } } } as const;
+export const includeRun = { modelVersion: true, datasetVersion: true, benchmark: true, metricResults: { include: { metricDefinition: true } }, anomalies: { select: { status: true, draftConclusion: true } }, _count: { select: { anomalies: true } } } as const;
 function hash(value: unknown) { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
 function storageKey(operation: string, key: string) { return operation + ":" + hash(key); }
 function codeOf(error: unknown) { return typeof error === "object" && error !== null && "code" in error ? String(error.code) : ""; }
@@ -138,7 +138,7 @@ export const evaluationRepository = {
       if (next === run.status) return tx.evaluationRun.findUniqueOrThrow({ where: { id }, include: includeRun });
       const error = next === "FAILED" ? { errorCode: "MOCK_EXECUTION_FAILED", errorMessage: "显式故障演示：模拟执行失败，可以创建新任务重试。" } : {};
       const changed = await tx.evaluationRun.updateMany({ where: { id, status: run.status }, data: { status: next,
-        ...(next === "RUNNING" ? { startedAt: new Date(run.createdAt.getTime() + 2000) } : { finishedAt: now }),
+        ...(next === "RUNNING" ? { startedAt: new Date(run.createdAt.getTime() + MOCK_EXECUTION_TIMING.startAfterMs) } : { finishedAt: now }),
         ...(next === "SUCCEEDED" ? { resultsGeneratedAt: now } : {}), ...error } });
       if (changed.count !== 1) return tx.evaluationRun.findUniqueOrThrow({ where: { id }, include: includeRun });
       if (next === "SUCCEEDED") {

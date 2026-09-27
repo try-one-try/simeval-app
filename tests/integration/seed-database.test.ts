@@ -50,7 +50,26 @@ describe.skipIf(!testUrl)("独立 MySQL 测试库", () => {
       expect(second).toEqual(first);
       expect(second.users).toHaveLength(3);
       expect(second.project?.id).toBe("demo-project-warehouse");
-      expect(second.runs).toHaveLength(2);
+      expect(second.runs).toHaveLength(4);
+      const { seedCatalog } = await import("../../prisma/catalog");
+      const historicalId = "demo-run-v21";
+      const historical = await db.evaluationRun.findUniqueOrThrow({ where: { id: historicalId }, include: { metricResults: true } });
+      expect(historical.metricResults).toHaveLength(4);
+      expect(historical.episodeCount).toBe(200);
+      // 增量更新不能恢复已经修改的记录；完成后还原测试夹具以免影响其他用例。
+      const result = historical.metricResults.find(metric => metric.id === historicalId + "-success")!;
+      try {
+        await db.evaluationRun.update({ where: { id: historicalId }, data: { name: "保留已有名称" } });
+        await db.metricResult.update({ where: { id: result.id }, data: { value: 69 } });
+        await seedCatalog(db);
+        await seedCatalog(db);
+        expect((await db.evaluationRun.findUniqueOrThrow({ where: { id: historicalId } })).name).toBe("保留已有名称");
+        expect(Number((await db.metricResult.findUniqueOrThrow({ where: { id: result.id } })).value)).toBe(69);
+        expect(await db.evaluationRun.count({ where: { isDemoFixture: true } })).toBe(4);
+      } finally {
+        await db.evaluationRun.update({ where: { id: historicalId }, data: { name: historical.name } });
+        await db.metricResult.update({ where: { id: result.id }, data: { value: result.value } });
+      }
       expect(second.samples).toHaveLength(2);
       expect(second.report).toEqual({ id: "demo-report-confirmed", runId: "demo-run-candidate", baselineRunId: "demo-run-baseline" });
       // 验证页面实际使用的关系查询，而不只检查表中存在固定 ID。

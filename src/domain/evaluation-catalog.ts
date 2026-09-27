@@ -3,6 +3,8 @@ import { z } from "zod";
 export const ACTIVE_TASK_LIMIT = 3;
 export const PROJECT_ID = "demo-project-warehouse";
 export const models = [
+  { id: "demo-model-v21", name: "PickPlace", version: "v2.1", selectable: false, success: 70, collision: 11, duration: 13.8, intervention: 8 },
+  { id: "demo-model-v22", name: "PickPlace", version: "v2.2", selectable: false, success: 73, collision: 9, duration: 13, intervention: 7 },
   { id: "demo-model-baseline", name: "PickPlace", version: "v2.3", selectable: false, success: 76, collision: 8, duration: 12.4, intervention: 6 },
   { id: "demo-model-candidate", name: "PickPlace", version: "v2.4", selectable: true, success: 81, collision: 13, duration: 11.8, intervention: 5 },
   { id: "demo-model-v25", name: "PickPlace", version: "v2.5", selectable: true, success: 84, collision: 9, duration: 11.4, intervention: 4 },
@@ -21,7 +23,7 @@ export const metricCatalog = [
   { suffix: "collision", key: "collision_rate", name: "碰撞率", unit: "%", direction: "LOWER_IS_BETTER" as const },
   { suffix: "duration", key: "duration", name: "平均耗时", unit: "s", direction: "LOWER_IS_BETTER" as const },
   { suffix: "intervention", key: "intervention_rate", name: "人工干预率", unit: "%", direction: "LOWER_IS_BETTER" as const },
-];
+] as const;
 export const metricId = (benchmarkId: string, suffix: string) => benchmarkId === "demo-benchmark-v1" ? `demo-metric-${suffix}` : `demo-occlusion-metric-${suffix}`;
 export const snapshotSchema = z.object({
   algorithm: z.literal("mock-v2"), modelId: z.string(), datasetId: z.string(), benchmarkId: z.string(),

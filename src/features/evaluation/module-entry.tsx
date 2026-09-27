@@ -6,22 +6,43 @@ import { evaluationService } from "@/server/application/evaluation";
 import { AppError, idSchema } from "@/domain/evaluation";
 import { TaskSelector, type TaskModule } from "./task-selector";
 import { RunContext, RunResults } from "./run-context";
+import { comparisonReviewService } from "@/server/application/comparison-review";
+import { sampleQuerySchema } from "@/domain/comparison-review";
+import { ComparisonView } from "@/features/review/comparison-view";
+import { AnomalyList } from "@/features/review/anomaly-list";
 import { WorkspaceNotice } from "@/components/workspace-notice";
+import { TASK_SELECTION_PAGE_SIZE } from "@/lib/evaluation-dto";
 const names = { evaluations: "评测任务", comparisons: "模型对比", anomalies: "异常复核", reports: "报告", overview: "总览" };
-export type ModuleParams = Promise<{ runId?: string | string[] }>;
+export type ModuleParams = Promise<Record<string, string | string[] | undefined>>;
 export async function ModuleEntry({ module, searchParams }: { module: TaskModule; searchParams: ModuleParams }) {
   const viewer = await requireViewer();
   if (module === "comparisons" && viewer.role !== "ENGINEER") return <WorkspaceNotice denied title="当前身份无法使用模型对比" description="模型对比由算法工程师操作；评测人员负责样本复核与报告确认。" />;
-  const runId = (await searchParams).runId;
-  if (runId === undefined) return <TaskSelector initial={await evaluationService.list(viewer, { page: 1, pageSize: 20 })} actor={viewer} module={module} />;
+  const params = await searchParams;
+  const runId = params.runId;
+  if (runId === undefined) return <TaskSelector initial={await evaluationService.list(viewer, { page: 1, pageSize: TASK_SELECTION_PAGE_SIZE })} actor={viewer} module={module} />;
   if (typeof runId !== "string" || !idSchema.safeParse(runId).success) notFound();
   let run;
   try { run = await evaluationService.get(viewer, runId); } catch (error) { if (error instanceof AppError && error.status === 404) notFound(); throw error; }
   if (module !== "overview" && run.status !== "SUCCEEDED") return <main className="content workflow-content"><RunContext run={run} href={"/" + module} /><h1>任务结果尚不可用</h1><p className="muted">当前状态：{run.status}。任务完成后才能进入{names[module]}。</p><Link className="primary-button" href={"/evaluations/" + run.id}>查看当前任务 →</Link></main>;
+  if (module === "comparisons") {
+    const baseline = params.baselineRunId === undefined ? run.baselineRunId : params.baselineRunId;
+    if (baseline !== null && (typeof baseline !== "string" || baseline !== "" && !idSchema.safeParse(baseline).success)) notFound();
+    if (params.scenarioKey !== undefined && (typeof params.scenarioKey !== "string" || !params.scenarioKey.trim() || params.scenarioKey.length > 120)) notFound();
+    let data, incompatibleMessage;
+    try { data = await comparisonReviewService.comparison(viewer, run.id, baseline || null, params.scenarioKey as string | undefined); }
+    catch (error) { if (error instanceof AppError && error.code === "INCOMPATIBLE_CONFIGURATION") incompatibleMessage=error.message; else {if (error instanceof AppError && error.status === 404) notFound(); throw error;} }
+    if (!data) return <main className="content state-content"><RunContext run={run} href="/comparisons" /><h1>这两个任务不能直接比较</h1><p className="muted">{incompatibleMessage}</p><Link className="primary-button" href={"/comparisons?runId="+run.id+"&baselineRunId="}>重新选择基线 →</Link></main>;
+    return <ComparisonView data={data} />;
+  }
+  if (module === "anomalies") {
+    const input = sampleQuerySchema.safeParse({ runId, ...Object.fromEntries(["metricKey", "scenarioKey", "reviewState", "status", "page", "pageSize"].filter(key => params[key] !== undefined).map(key => [key, params[key]])) });
+    if (!input.success || params.baselineRunId !== undefined && typeof params.baselineRunId !== "string") notFound();
+    return <AnomalyList data={await comparisonReviewService.list(viewer, input.data)} query={input.data} actor={viewer} baselineRunId={params.baselineRunId as string | undefined} />;
+  }
   return <main className="content workflow-content selected-module-view">
     <RunContext run={run} href={"/" + module} /><p className="page-context">{names[module]} / 当前任务</p>
     <div className="overview-heading"><div><h1>{module === "overview" ? "本次评测总览" : names[module]}</h1><p className="muted">{run.modelName} {run.modelVersion} · {run.datasetName} {run.datasetVersion} · {run.status}</p></div></div>
-    {module === "overview" ? <><RunResults run={run} /><dl className="task-facts"><div><dt>Benchmark</dt><dd>{run.benchmarkName} {run.benchmarkVersion}</dd></div><div><dt>运行口径</dt><dd>{run.episodeCount} Episodes · Seed {run.simulationSeed}</dd></div><div><dt>历史基线</dt><dd>{run.baselineRunId ? "已指定比较对象" : "未指定；可独立执行"}</dd></div></dl><p className="quality-caption muted">{run.successRule}</p></> : <><p className="muted">{module === "comparisons" ? "同口径比较与指标下钻将在阶段 5 接通。" : module === "anomalies" ? "异常列表、证据详情与可编辑复核结论将在阶段 5 接通。" : "AI 草稿与人工确认将在阶段 6 接通。"}当前已保留所选任务，尚未开放的操作不会生成结果。</p>{run.pendingReviewCount > 0 && <p className="pending-review"><strong>{run.pendingReviewCount} 条待复核</strong><span>需评测人员复核</span></p>}</>}
+    {module === "overview" ? <><RunResults run={run} /><dl className="task-facts"><div><dt>Benchmark</dt><dd>{run.benchmarkName} {run.benchmarkVersion}</dd></div><div><dt>运行口径</dt><dd>{run.episodeCount} Episodes · Seed {run.simulationSeed}</dd></div><div><dt>历史基线</dt><dd>{run.baselineRunId ? "已指定比较对象" : "未指定；可独立执行"}</dd></div></dl><p className="quality-caption muted">{run.successRule}</p></> : <><p className="muted">报告功能正在规划，生成与确认暂未开放。当前已保留所选任务，尚未开放的操作不会生成结果。</p>{run.pendingReviewCount > 0 && <p className="pending-review"><strong>{run.pendingReviewCount} 条待复核</strong><span>需评测人员复核</span></p>}</>}
     <div className="workflow-actions"><Link className="primary-button" href={module === "overview" && run.status === "SUCCEEDED" ? (viewer.role === "ENGINEER" ? "/comparisons" : "/anomalies") + "?runId=" + run.id : "/evaluations/" + run.id}>{module === "overview" && run.status === "SUCCEEDED" ? viewer.role === "ENGINEER" ? "查看模型对比 →" : "查看异常复核 →" : "查看当前任务 →"}</Link>{module !== "overview" && <Link className="text-action" href={"/overview?runId=" + run.id}>查看本次总览 ↗</Link>}{viewer.role === "ENGINEER" && <Link className="text-action" href="/evaluations/new">创建新评测 ＋</Link>}</div>
     <p className="fine-print">合成数据 · 模拟执行 · 不代表真实模型表现</p>
   </main>;

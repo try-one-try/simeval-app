@@ -143,6 +143,8 @@ async function seedStory() {
         status: "RESOLVED" as const, assigneeId: "demo-user-reviewer",
         logExcerpt: sample.logExcerpt, metadata: { synthetic: true },
         conclusion: sample.conclusion, version: 1, resolvedAt: at(11),
+        draftConclusion: null, draftUpdatedById: null, draftUpdatedAt: null,
+        confirmedRevision: 1, confirmedById: "demo-user-reviewer", confirmedAt: at(11),
       };
       await tx.anomalySample.upsert({ where: { id: sample.id }, create: { id: sample.id, ...data }, update: data });
       await tx.reviewRecord.upsert({
@@ -160,7 +162,7 @@ async function seedStory() {
 
     const report = {
       runId: "demo-run-candidate", baselineRunId: "demo-run-baseline",
-      status: "CONFIRMED" as const,
+      status: "CONFIRMED" as const, isStale: false, staleAt: null,
       inputSnapshot: { synthetic: true, metrics: ["demo-result-baseline-success", "demo-result-candidate-success", "demo-result-baseline-collision", "demo-result-candidate-collision"], samples: ["demo-sample-017", "demo-sample-018"] },
       output: { summary: "合成示例：总体成功率上升，但遮挡场景碰撞率回退，需要先处理数据标签问题并改进抓取路径。", evidence: ["demo-result-candidate-collision", "demo-sample-017", "demo-sample-018"] },
       provider: "CachedInsightProvider", model: "synthetic-fixture",
