@@ -1,3 +1,7 @@
+# 当前数据库说明
+
+阶段 6 改用 PostgreSQL；运行与连接配置以[部署验收](../004-deployment/quickstart.md)为准。下文 MySQL 测试数量保留历史证据，不代表本次换库验证。
+
 # 阶段 5 验收
 
 **阶段 5 已提交，本轮补充核心演示任务与同任务双向导航。** 用下面步骤核对功能。基础运行看 [README](../../README.md)。
@@ -51,4 +55,4 @@ npm run dev
 
 系统示例使用英文场景＋用途＋版本命名；模型统一为 `PickPlace Policy`。一键配置填入 `Custom - Warehouse Manipulation v2.4`，用户仍可自由改名。
 
-阶段 6 方案另行讨论。本轮演示集补全与导航改进尚未 commit／push。
+后续先部署、再改主页；AI 报告 Agent 留阶段 8 另行讨论。本轮演示集补全与导航改进尚未 commit／push。

@@ -1,0 +1,31 @@
+// 仅供负责人维护专用演示库；清理与重建同一事务提交，失败保留原数据和表结构。
+import type { PrismaClient } from "../src/generated/prisma/client";
+import { seedDefaultData } from "./seed-data";
+
+export async function resetDemoData(db: PrismaClient, demoPassword: string) {
+  if (!demoPassword) throw new Error("DEMO_PASSWORD is required for reset");
+  await db.$transaction(async tx => {
+    const projects = await tx.project.findMany({ select: { slug: true } });
+    const users = await tx.user.findMany({ select: { isDemo: true } });
+    if (projects.length !== 1 || projects[0].slug !== "warehouse-manipulation" || users.some(user => !user.isDemo)) {
+      throw new Error("恢复只允许专用 SimEval 演示库，不能包含其他项目或真实用户。");
+    }
+    // 先删除引用方，再删除父记录；任务自关联先解除，不使用 DROP／TRUNCATE CASCADE。
+    await tx.auditLog.deleteMany();
+    await tx.aIReport.deleteMany();
+    await tx.backfillTask.deleteMany();
+    await tx.reviewRecord.deleteMany();
+    await tx.metricResult.deleteMany();
+    await tx.anomalySample.deleteMany();
+    await tx.evaluationRun.updateMany({ data: { baselineRunId: null, retryOfRunId: null } });
+    await tx.evaluationRun.deleteMany();
+    await tx.dataQualityCheck.deleteMany();
+    await tx.metricDefinition.deleteMany();
+    await tx.benchmark.deleteMany();
+    await tx.datasetVersion.deleteMany();
+    await tx.modelVersion.deleteMany();
+    await tx.project.deleteMany();
+    await tx.user.deleteMany();
+    await seedDefaultData(tx, demoPassword);
+  }, { timeout: 60_000 });
+}

@@ -1,4 +1,4 @@
-// 网页身份认证：从用户表读 passwordHash，与提交的演示口令比较；它不使用 MySQL 连接密码。
+// 网页身份认证：从用户表读 passwordHash，与提交的演示口令比较；它不使用数据库连接密码。
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { authenticateDemo } from "@/server/auth/authenticate-demo";

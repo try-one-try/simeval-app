@@ -9,7 +9,7 @@
 
 ## 2. 持久化决定
 AnomalySample 加 draftConclusion／draftUpdatedById／draftUpdatedAt、confirmedById／confirmedAt／confirmedRevision；version 是所有写入的乐观锁。ReviewRecord 加 mode、fromVersion／toVersion／confirmedRevision，只追加。旧 RESOLVED 非空结论补修订 1，保留原内容、状态和历史。
-AIReport 只加 isStale／staleAt，最终改变后保守标记关联候选或基线任务的现有报告过时；报告生成与确认留阶段 6 重新设计。
+AIReport 只加 isStale／staleAt，最终改变后保守标记关联候选或基线任务的现有报告过时；报告生成与确认留阶段 8 重新设计；阶段 6 先部署，阶段 7 改主页。
 复核先锁 EvaluationRun，确认未软删除且成功，再用 sample.version 条件更新；历史、审计、报告过时同事务。更新竞争返回 409 VERSION_CONFLICT，输入保留。草稿不替换最终内容，确认修订号与编辑 version 分开。
 
 ## 3. 交互与 API

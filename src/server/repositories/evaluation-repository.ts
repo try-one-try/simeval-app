@@ -44,7 +44,7 @@ async function checkedConfiguration(tx: Tx, input: CreateRunInput, allowReferenc
 }
 async function createInTransaction(tx: Tx, actor: Actor, input: CreateRunInput, key: string, operation: string, retryOfRunId: string | null) {
   // 同账号的创建串行化，防止不同幂等键并发突破容量；幂等重放不占名额。
-  await tx.$queryRaw(Prisma.sql`SELECT id FROM User WHERE id = ${actor.id} FOR UPDATE`);
+  await tx.$queryRaw(Prisma.sql`SELECT id FROM "User" WHERE id = ${actor.id} FOR UPDATE`);
   const idempotencyKey = storageKey(operation, key);
   const requestFingerprint = hash({ input, retryOfRunId });
   const previous = await tx.evaluationRun.findUnique({ where: { createdById_idempotencyKey: { createdById: actor.id, idempotencyKey } }, include: includeRun });

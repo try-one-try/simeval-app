@@ -14,6 +14,6 @@ export default defineConfig({
   },
   datasource: {
     // CLI 用该连接执行迁移；网页运行时另经 src/server/db.ts 创建客户端。
-    url: process.env.DATABASE_URL,
+    url: process.env.DIRECT_URL || process.env.DATABASE_URL_UNPOOLED || process.env.DATABASE_URL,
   },
 });

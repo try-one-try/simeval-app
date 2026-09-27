@@ -6,7 +6,7 @@ generator client {
 
 datasource db {
   // 这里声明数据库类型；连接地址由 prisma7.config.ts 从 DATABASE_URL 提供。
-  provider = "mysql"
+  provider = "postgresql"
 }
 
 enum Role {
@@ -63,23 +63,23 @@ enum ReportStatus {
 }
 
 model User {
-  id             String          @id @default(cuid()) @db.VarChar(64)
-  email          String          @unique @db.VarChar(191)
-  name           String          @db.VarChar(120)
-  role           Role
-  passwordHash   String          @db.VarChar(255)
-  isDemo         Boolean         @default(false)
-  createdAt      DateTime        @default(now())
-  createdRuns    EvaluationRun[] @relation("RunCreator")
-  assignedSamples AnomalySample[] @relation("SampleAssignee")
-  draftSamples AnomalySample[] @relation("DraftEditor")
-  confirmedSamples AnomalySample[] @relation("SampleConfirmer")
-  reviews        ReviewRecord[]  @relation("Reviewer")
-  createdBackfills BackfillTask[] @relation("BackfillCreator")
-  assignedBackfills BackfillTask[] @relation("BackfillAssignee")
-  requestedReports AIReport[] @relation("ReportRequester")
-  confirmedReports AIReport[] @relation("ReportConfirmer")
-  audits         AuditLog[]      @relation("AuditActor")
+  id                String          @id @default(cuid()) @db.VarChar(64)
+  email             String          @unique @db.VarChar(191)
+  name              String          @db.VarChar(120)
+  role              Role
+  passwordHash      String          @db.VarChar(255)
+  isDemo            Boolean         @default(false)
+  createdAt         DateTime        @default(now())
+  createdRuns       EvaluationRun[] @relation("RunCreator")
+  assignedSamples   AnomalySample[] @relation("SampleAssignee")
+  draftSamples      AnomalySample[] @relation("DraftEditor")
+  confirmedSamples  AnomalySample[] @relation("SampleConfirmer")
+  reviews           ReviewRecord[]  @relation("Reviewer")
+  createdBackfills  BackfillTask[]  @relation("BackfillCreator")
+  assignedBackfills BackfillTask[]  @relation("BackfillAssignee")
+  requestedReports  AIReport[]      @relation("ReportRequester")
+  confirmedReports  AIReport[]      @relation("ReportConfirmer")
+  audits            AuditLog[]      @relation("AuditActor")
 }
 
 model Project {
@@ -103,6 +103,7 @@ model ModelVersion {
   metadata    Json?
   project     Project         @relation(fields: [projectId], references: [id])
   runs        EvaluationRun[]
+
   @@unique([projectId, name, version])
 }
 
@@ -117,6 +118,7 @@ model DatasetVersion {
   project       Project            @relation(fields: [projectId], references: [id])
   checks        DataQualityCheck[]
   runs          EvaluationRun[]
+
   @@unique([projectId, name, version])
 }
 
@@ -130,18 +132,20 @@ model DataQualityCheck {
   message          String         @db.Text
   details          Json?
   datasetVersion   DatasetVersion @relation(fields: [datasetVersionId], references: [id])
+
   @@unique([datasetVersionId, checkKey])
   @@index([datasetVersionId, status])
 }
 
 model Benchmark {
-  id          String             @id @default(cuid()) @db.VarChar(64)
-  projectId   String             @db.VarChar(64)
-  name        String             @db.VarChar(120)
-  version     String             @db.VarChar(64)
-  project     Project            @relation(fields: [projectId], references: [id])
-  metrics     MetricDefinition[]
-  runs        EvaluationRun[]
+  id        String             @id @default(cuid()) @db.VarChar(64)
+  projectId String             @db.VarChar(64)
+  name      String             @db.VarChar(120)
+  version   String             @db.VarChar(64)
+  project   Project            @relation(fields: [projectId], references: [id])
+  metrics   MetricDefinition[]
+  runs      EvaluationRun[]
+
   @@unique([projectId, name, version])
 }
 
@@ -154,53 +158,55 @@ model MetricDefinition {
   direction   MetricDirection
   benchmark   Benchmark       @relation(fields: [benchmarkId], references: [id])
   results     MetricResult[]
+
   @@unique([benchmarkId, key])
 }
 
 model EvaluationRun {
-  id                 String          @id @default(cuid()) @db.VarChar(64)
+  id                    String          @id @default(cuid()) @db.VarChar(64)
   // 旧固定任务兼容空名称；新任务记录名称、幂等指纹和显式故障演示选项。
-  name               String?         @db.VarChar(120)
-  requestFingerprint String?         @db.VarChar(64)
-  mockFailure        Boolean         @default(false)
+  name                  String?         @db.VarChar(120)
+  requestFingerprint    String?         @db.VarChar(64)
+  mockFailure           Boolean         @default(false)
   // 快照固定模拟口径；软删除只隐藏列表，不破坏历史引用。
-  targetSuccessRate  Decimal?        @db.Decimal(5, 4)
+  targetSuccessRate     Decimal?        @db.Decimal(5, 4)
   configurationSnapshot Json?
-  deletedAt          DateTime?
-  deletedById        String?         @db.VarChar(64)
-  projectId          String          @db.VarChar(64)
-  modelVersionId     String          @db.VarChar(64)
-  datasetVersionId   String          @db.VarChar(64)
-  benchmarkId        String          @db.VarChar(64)
-  baselineRunId      String?         @db.VarChar(64)
-  retryOfRunId       String?         @db.VarChar(64)
-  status             RunStatus
-  createdById        String          @db.VarChar(64)
-  provider           String          @db.VarChar(80)
-  externalJobId      String?         @db.VarChar(191)
-  episodeCount       Int
-  simulationSeed     Int
-  isDemoFixture      Boolean         @default(false)
-  startedAt          DateTime?
-  finishedAt         DateTime?
-  resultsGeneratedAt DateTime?
-  errorCode          String?         @db.VarChar(120)
-  errorMessage       String?         @db.Text
-  idempotencyKey     String?         @db.VarChar(128)
-  createdAt          DateTime        @default(now())
-  project            Project         @relation(fields: [projectId], references: [id])
-  modelVersion       ModelVersion    @relation(fields: [modelVersionId], references: [id])
-  datasetVersion     DatasetVersion  @relation(fields: [datasetVersionId], references: [id])
-  benchmark          Benchmark       @relation(fields: [benchmarkId], references: [id])
-  createdBy          User            @relation("RunCreator", fields: [createdById], references: [id])
-  baselineRun        EvaluationRun?  @relation("BaselineRun", fields: [baselineRunId], references: [id])
-  comparisons        EvaluationRun[] @relation("BaselineRun")
-  retryOfRun         EvaluationRun?  @relation("RetryRun", fields: [retryOfRunId], references: [id])
-  retries            EvaluationRun[] @relation("RetryRun")
-  metricResults      MetricResult[]
-  anomalies          AnomalySample[]
-  reports            AIReport[]      @relation("ReportRun")
-  baselineReports    AIReport[]      @relation("ReportBaseline")
+  deletedAt             DateTime?
+  deletedById           String?         @db.VarChar(64)
+  projectId             String          @db.VarChar(64)
+  modelVersionId        String          @db.VarChar(64)
+  datasetVersionId      String          @db.VarChar(64)
+  benchmarkId           String          @db.VarChar(64)
+  baselineRunId         String?         @db.VarChar(64)
+  retryOfRunId          String?         @db.VarChar(64)
+  status                RunStatus
+  createdById           String          @db.VarChar(64)
+  provider              String          @db.VarChar(80)
+  externalJobId         String?         @db.VarChar(191)
+  episodeCount          Int
+  simulationSeed        Int
+  isDemoFixture         Boolean         @default(false)
+  startedAt             DateTime?
+  finishedAt            DateTime?
+  resultsGeneratedAt    DateTime?
+  errorCode             String?         @db.VarChar(120)
+  errorMessage          String?         @db.Text
+  idempotencyKey        String?         @db.VarChar(128)
+  createdAt             DateTime        @default(now())
+  project               Project         @relation(fields: [projectId], references: [id])
+  modelVersion          ModelVersion    @relation(fields: [modelVersionId], references: [id])
+  datasetVersion        DatasetVersion  @relation(fields: [datasetVersionId], references: [id])
+  benchmark             Benchmark       @relation(fields: [benchmarkId], references: [id])
+  createdBy             User            @relation("RunCreator", fields: [createdById], references: [id])
+  baselineRun           EvaluationRun?  @relation("BaselineRun", fields: [baselineRunId], references: [id])
+  comparisons           EvaluationRun[] @relation("BaselineRun")
+  retryOfRun            EvaluationRun?  @relation("RetryRun", fields: [retryOfRunId], references: [id])
+  retries               EvaluationRun[] @relation("RetryRun")
+  metricResults         MetricResult[]
+  anomalies             AnomalySample[]
+  reports               AIReport[]      @relation("ReportRun")
+  baselineReports       AIReport[]      @relation("ReportBaseline")
+
   @@unique([createdById, idempotencyKey])
   @@index([projectId, status, createdAt])
   @@index([createdById, deletedAt, status])
@@ -215,38 +221,40 @@ model MetricResult {
   sampleCount        Int
   run                EvaluationRun    @relation(fields: [runId], references: [id])
   metricDefinition   MetricDefinition @relation(fields: [metricDefinitionId], references: [id])
+
   @@unique([runId, metricDefinitionId, scenarioKey])
 }
 
 model AnomalySample {
-  id             String         @id @default(cuid()) @db.VarChar(64)
-  runId          String         @db.VarChar(64)
-  sampleNumber   String         @db.VarChar(80)
-  scenarioKey    String         @db.VarChar(120)
-  anomalyType    String         @db.VarChar(120)
-  metricKey      String         @db.VarChar(120)
-  reviewCategory ReviewCategory?
-  status         SampleStatus
-  assigneeId     String?        @db.VarChar(64)
-  mediaPath      String?        @db.VarChar(255)
-  logExcerpt     String?        @db.Text
-  metadata       Json?
+  id                String          @id @default(cuid()) @db.VarChar(64)
+  runId             String          @db.VarChar(64)
+  sampleNumber      String          @db.VarChar(80)
+  scenarioKey       String          @db.VarChar(120)
+  anomalyType       String          @db.VarChar(120)
+  metricKey         String          @db.VarChar(120)
+  reviewCategory    ReviewCategory?
+  status            SampleStatus
+  assigneeId        String?         @db.VarChar(64)
+  mediaPath         String?         @db.VarChar(255)
+  logExcerpt        String?         @db.Text
+  metadata          Json?
   // 草稿与最终结论隔离；version 防覆盖，confirmedRevision 标记最终内容变化。
-  draftConclusion String?       @db.Text
-  draftUpdatedById String?      @db.VarChar(64)
-  draftUpdatedAt DateTime?
-  confirmedById String?         @db.VarChar(64)
-  confirmedAt DateTime?
-  confirmedRevision Int         @default(0)
-  conclusion     String?        @db.Text
-  version        Int            @default(1)
-  resolvedAt     DateTime?
-  run            EvaluationRun  @relation(fields: [runId], references: [id])
-  assignee       User?          @relation("SampleAssignee", fields: [assigneeId], references: [id])
-  draftUpdatedBy User? @relation("DraftEditor", fields: [draftUpdatedById], references: [id])
-  confirmedBy User? @relation("SampleConfirmer", fields: [confirmedById], references: [id])
-  reviews        ReviewRecord[]
-  backfills      BackfillTask[]
+  draftConclusion   String?         @db.Text
+  draftUpdatedById  String?         @db.VarChar(64)
+  draftUpdatedAt    DateTime?
+  confirmedById     String?         @db.VarChar(64)
+  confirmedAt       DateTime?
+  confirmedRevision Int             @default(0)
+  conclusion        String?         @db.Text
+  version           Int             @default(1)
+  resolvedAt        DateTime?
+  run               EvaluationRun   @relation(fields: [runId], references: [id])
+  assignee          User?           @relation("SampleAssignee", fields: [assigneeId], references: [id])
+  draftUpdatedBy    User?           @relation("DraftEditor", fields: [draftUpdatedById], references: [id])
+  confirmedBy       User?           @relation("SampleConfirmer", fields: [confirmedById], references: [id])
+  reviews           ReviewRecord[]
+  backfills         BackfillTask[]
+
   @@unique([runId, sampleNumber])
   @@index([runId, metricKey, scenarioKey, status])
   @@index([assigneeId, status])
@@ -255,21 +263,22 @@ model AnomalySample {
 }
 
 model ReviewRecord {
-  id              String          @id @default(cuid()) @db.VarChar(64)
-  anomalySampleId String          @db.VarChar(64)
-  reviewerId      String          @db.VarChar(64)
-  fromStatus      SampleStatus
-  toStatus        SampleStatus
-  category        ReviewCategory?
-  conclusion      String?         @db.Text
-  reopenReason    String?         @db.Text
-  mode String? @db.VarChar(16)
-  fromVersion Int?
-  toVersion Int?
+  id                String          @id @default(cuid()) @db.VarChar(64)
+  anomalySampleId   String          @db.VarChar(64)
+  reviewerId        String          @db.VarChar(64)
+  fromStatus        SampleStatus
+  toStatus          SampleStatus
+  category          ReviewCategory?
+  conclusion        String?         @db.Text
+  reopenReason      String?         @db.Text
+  mode              String?         @db.VarChar(16)
+  fromVersion       Int?
+  toVersion         Int?
   confirmedRevision Int?
-  createdAt       DateTime        @default(now())
-  anomalySample   AnomalySample   @relation(fields: [anomalySampleId], references: [id])
-  reviewer        User            @relation("Reviewer", fields: [reviewerId], references: [id])
+  createdAt         DateTime        @default(now())
+  anomalySample     AnomalySample   @relation(fields: [anomalySampleId], references: [id])
+  reviewer          User            @relation("Reviewer", fields: [reviewerId], references: [id])
+
   @@index([anomalySampleId, createdAt])
 }
 
@@ -286,30 +295,32 @@ model BackfillTask {
   anomalySample   AnomalySample  @relation(fields: [anomalySampleId], references: [id])
   assignee        User?          @relation("BackfillAssignee", fields: [assigneeId], references: [id])
   createdBy       User           @relation("BackfillCreator", fields: [createdById], references: [id])
+
   @@index([status, assigneeId])
 }
 
 model AIReport {
-  id              String         @id @default(cuid()) @db.VarChar(64)
-  runId           String         @db.VarChar(64)
-  baselineRunId   String?        @db.VarChar(64)
-  status          ReportStatus
-  isStale         Boolean        @default(false)
-  staleAt         DateTime?
-  inputSnapshot   Json
-  output          Json
-  provider        String         @db.VarChar(80)
-  model           String?        @db.VarChar(80)
-  requestedById   String         @db.VarChar(64)
-  confirmedById   String?        @db.VarChar(64)
-  confirmedAt     DateTime?
-  idempotencyKey  String?        @db.VarChar(128)
-  errorMessage    String?        @db.Text
-  createdAt       DateTime       @default(now())
-  run             EvaluationRun  @relation("ReportRun", fields: [runId], references: [id])
-  baselineRun     EvaluationRun? @relation("ReportBaseline", fields: [baselineRunId], references: [id])
-  requestedBy     User           @relation("ReportRequester", fields: [requestedById], references: [id])
-  confirmedBy     User?          @relation("ReportConfirmer", fields: [confirmedById], references: [id])
+  id             String         @id @default(cuid()) @db.VarChar(64)
+  runId          String         @db.VarChar(64)
+  baselineRunId  String?        @db.VarChar(64)
+  status         ReportStatus
+  isStale        Boolean        @default(false)
+  staleAt        DateTime?
+  inputSnapshot  Json
+  output         Json
+  provider       String         @db.VarChar(80)
+  model          String?        @db.VarChar(80)
+  requestedById  String         @db.VarChar(64)
+  confirmedById  String?        @db.VarChar(64)
+  confirmedAt    DateTime?
+  idempotencyKey String?        @db.VarChar(128)
+  errorMessage   String?        @db.Text
+  createdAt      DateTime       @default(now())
+  run            EvaluationRun  @relation("ReportRun", fields: [runId], references: [id])
+  baselineRun    EvaluationRun? @relation("ReportBaseline", fields: [baselineRunId], references: [id])
+  requestedBy    User           @relation("ReportRequester", fields: [requestedById], references: [id])
+  confirmedBy    User?          @relation("ReportConfirmer", fields: [confirmedById], references: [id])
+
   @@unique([requestedById, idempotencyKey])
 }
 
@@ -323,5 +334,6 @@ model AuditLog {
   metadata   Json?
   createdAt  DateTime @default(now())
   actor      User     @relation("AuditActor", fields: [actorId], references: [id])
+
   @@index([entityType, entityId, createdAt])
 }

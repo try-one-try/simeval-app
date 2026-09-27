@@ -1,3 +1,5 @@
+> 数据库更新：本文保留基础切片的 MySQL 历史方案与证据；当前 PostgreSQL 配置、迁移和运行以[部署切片](../004-deployment/quickstart.md)为准。
+
 # Implementation Plan: 演示工作台基础
 
 **Feature directory**: `specs/001-demo-foundation` | **Date**: 2026-09-23 | **Spec**: [spec.md](spec.md)  
@@ -20,7 +22,7 @@
 | Storage | MySQL 8；Prisma ORM 7、正式迁移文件和显式 Seed |
 | Validation | Zod 校验登录输入与未来 HTTP 输入；页面不直接读取 Prisma |
 | Tests | ESLint、TypeScript、Vitest 单元与数据库集成检查、项目负责人手工浏览器验收、生产构建 |
-| Platform | 本机 Windows 开发；后续 Vercel 部署与托管 MySQL 在阶段 7 决定 |
+| Platform | 本机 Windows 开发；原计划候选为 Vercel＋托管 MySQL；现于阶段 6 重做部署选型，仍保留 Next.js＋MySQL |
 | Constraints | 保留现有未提交文件；只在 `simeval-app/` 创建公开代码；不用微服务、队列、WebSocket；不能修改既有数据库 |
 
 当前官方版本依据、Auth.js 权衡与本机阻碍见 [research.md](research.md)。安装时在 `package-lock.json` 固定实际通过验证的精确依赖版本，不直接把 `latest` 视为兼容性保证。

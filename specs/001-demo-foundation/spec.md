@@ -1,3 +1,5 @@
+> 数据库更新：本文保留基础切片的 MySQL 历史方案与证据；当前 PostgreSQL 配置、迁移和运行以[部署切片](../004-deployment/quickstart.md)为准。
+
 # Feature Specification: 演示工作台基础
 
 **Feature directory**: `specs/001-demo-foundation`  

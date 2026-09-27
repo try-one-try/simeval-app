@@ -4,7 +4,7 @@
 
 ## 1. 运行边界
 
-Next.js、TypeScript、Auth.js、Prisma、MySQL 组成模块化单体，一个应用部署。合成数据、预置质量报告、模拟执行与缓存报告必须标注；不运行真实仿真、训练或 ETL。不增加微服务、队列、Worker 或 WebSocket。
+Next.js、TypeScript、Auth.js、Prisma、PostgreSQL 组成模块化单体，一个应用部署。合成数据、预置质量报告、模拟执行与缓存报告必须标注；不运行真实仿真、训练或 ETL。不增加微服务、队列、Worker 或 WebSocket。
 
 ## 2. 文件与调用关系
 
@@ -21,7 +21,7 @@ Next.js、TypeScript、Auth.js、Prisma、MySQL 组成模块化单体，一个�
 | `src/server/repositories/` | Prisma 查询、条件更新与事务 |
 | `src/server/providers/` | 可替换 EvaluationProvider；现有确定性 Mock |
 | `src/server/db.ts`、`prisma/` | 连接池、Schema、追加迁移和幂等 Seed |
-| `tests/unit`、`tests/integration` | 规则／HTTP 边界与独立 MySQL 集成验证 |
+| `tests/unit`、`tests/integration` | 规则／HTTP 边界与独立 PostgreSQL 集成验证 |
 
 ~~~mermaid
 flowchart LR
@@ -32,7 +32,7 @@ flowchart LR
   A --> D[领域规则]
   A --> R[事务仓储]
   R --> E[现有 Mock 纯计算]
-  R --> DB[(MySQL)]
+  R --> DB[(PostgreSQL)]
 ~~~
 
 登录／切换走 Server Action：所选身份 → 服务端读取演示口令 → Credentials 核对预设 email、isDemo、数据库角色和 bcrypt 摘要 → Auth.js 更新 Cookie → 角色默认页。页面与 HTTP 每次用会话 userId 重新查数据库；历史 ADMIN 或不匹配账号视为失效。切换前不退出原账号，认证失败仍可返回原会话。
@@ -55,7 +55,7 @@ flowchart LR
 
 ## 4. 已迁移与后续数据变化
 
-阶段 4 追加 `202609270001_autonomous_evaluation`，阶段 5 追加 `202609270002_comparison_review`。不 reset，不覆盖已有用户任务。
+阶段 4 追加 `202609270001_autonomous_evaluation`，阶段 5 追加 `202609270002_comparison_review`。它们是 MySQL 历史迁移，现已原样归档到 prisma/archive/mysql-migrations。阶段 6 使用当前 Schema 的 PostgreSQL 初始迁移创建独立新库，旧 MySQL 数据库保留；后续 PostgreSQL 变更继续追加。运行、TLS、直连、恢复与上线验证见[部署验收](../specs/004-deployment/quickstart.md)。
 
 | 对象 | 目标变化 |
 |---|---|
@@ -85,7 +85,7 @@ Schema 改动后生成 Client、应用迁移、重启旧服务，再验网页。
 
 ### 阶段 5 的调用与事务
 
-comparison-view / anomaly-list / sample-detail / review-editor → HTTP 统一边界 → comparison-review 应用服务 → 领域规则／仓储 → MySQL。页面首读直接调用同一应用服务；DTO 只发送公开证据、人物姓名与版本。
+comparison-view / anomaly-list / sample-detail / review-editor → HTTP 统一边界 → comparison-review 应用服务 → 领域规则／仓储 → PostgreSQL。页面首读直接调用同一应用服务；DTO 只发送公开证据、人物姓名与版本。
 
 复核先锁 EvaluationRun，复查成功／未隐藏及权限；再检查 AnomalySample.version 并条件更新。当前内容、ReviewRecord、旧报告过时标记、AuditLog 同事务提交。两个请求拿同一版本时一个成功、另一个 409；前端保留后者输入。任务删除也锁同一任务，防止隐藏后继续写复核。
 

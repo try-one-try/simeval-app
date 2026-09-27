@@ -1,6 +1,7 @@
 # 依赖、构建与生成产物由安装和构建命令再生，不进入仓库。
 node_modules/
 .npm-cache/
+.local-postgres/
 src/generated/prisma/
 .next/
 out/

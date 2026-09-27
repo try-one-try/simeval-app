@@ -1,9 +1,9 @@
 ﻿param(
   [ValidateSet('dev', 'test')]
   [string]$Database = 'test',
-  [string]$AdminUser = 'root',
+  [string]$AdminUser = 'postgres',
   [string]$AdminHost = '127.0.0.1',
-  [int]$AdminPort = 3306
+  [int]$AdminPort = 5432
 )
 
 # 只在当前进程中把隐藏输入交给 Node 初始化程序；退出前清除临时环境变量。
@@ -14,7 +14,7 @@ if (Test-Path -LiteralPath (Join-Path $projectRoot $targetEnv)) {
   exit 1
 }
 
-$securePassword = Read-Host '输入 MySQL 管理员密码（输入时不显示）' -AsSecureString
+$securePassword = Read-Host '输入 PostgreSQL 管理员密码（输入时不显示）' -AsSecureString
 $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
 $result = 1
 try {

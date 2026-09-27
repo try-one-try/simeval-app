@@ -57,7 +57,7 @@ export const comparisonReviewRepository = {
       const identity=await tx.anomalySample.findUnique({where:{id},select:{runId:true}});
       if(!identity) throw new AppError("NOT_FOUND","样本不存在",404);
       // 和任务删除使用同一行锁，防止隐藏后仍然提交复核。
-      await tx.$queryRaw(Prisma.sql`SELECT id FROM EvaluationRun WHERE id = ${identity.runId} FOR UPDATE`);
+      await tx.$queryRaw(Prisma.sql`SELECT id FROM "EvaluationRun" WHERE id = ${identity.runId} FOR UPDATE`);
       const selected=await tx.evaluationRun.findUnique({where:{id:identity.runId}});
       if(!selected || selected.deletedAt) throw new AppError("NOT_FOUND","任务已隐藏，不能继续复核",404);
       if(selected.status!=="SUCCEEDED") throw new AppError("STATE_CONFLICT","任务完成后才能复核",409);

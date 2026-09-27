@@ -1,13 +1,13 @@
 // 网页运行时的数据库入口：把经校验的连接参数交给 Prisma；每个服务进程复用客户端和连接池。
 import "server-only";
-import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@/generated/prisma/client";
 import { getDatabaseConnection } from "@/server/env";
 
 const globalForPrisma = globalThis as typeof globalThis & { simevalPrisma?: PrismaClient };
 
 function createPrismaClient() {
-  const adapter = new PrismaMariaDb({ ...getDatabaseConnection(), connectionLimit: 5 });
+  const adapter = new PrismaPg(getDatabaseConnection());
   return new PrismaClient({ adapter });
 }
 

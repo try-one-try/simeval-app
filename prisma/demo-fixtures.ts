@@ -1,5 +1,5 @@
 // 补齐六类核心场景；已有同名演示沿用原 ID，重复执行不重置人工内容或恢复删除。
-import type { PrismaClient } from "../src/generated/prisma/client";
+import type { Prisma } from "../src/generated/prisma/client";
 import { PROJECT_ID, DEMO_RUN_NAMES, configurationProfile, metricCatalog, metricId } from "../src/domain/evaluation-catalog";
 import { generateSimulationMetrics } from "../src/domain/simulation-results";
 
@@ -18,8 +18,7 @@ const scenarios: DemoScenario[] = [
   { ...common, id: "demo-run-occlusion", modelVersionId: "demo-model-v25", benchmarkId: "demo-benchmark-occlusion-v1", targetSuccessRate: .85, status: "SUCCEEDED" },
 ];
 
-export async function seedDemoScenarios(db: PrismaClient) {
-  await db.$transaction(async tx => {
+export async function seedDemoScenarios(tx: Prisma.TransactionClient) {
     const ids = new Map<string, string>();
     for (const [index, scenario] of scenarios.entries()) {
       const name = DEMO_RUN_NAMES[scenario.id];
@@ -91,5 +90,4 @@ export async function seedDemoScenarios(db: PrismaClient) {
       await tx.auditLog.create({ data: { actorId: "demo-user-engineer", requestId: "demo-core-fixtures-v1", action: "DEMO_FIXTURE_CREATED",
         entityType: "EvaluationRun", entityId: scenario.id, metadata: { synthetic: true, fixtureKey: scenario.id, status: scenario.status } } });
     }
-  }, { timeout: 30000 });
 }

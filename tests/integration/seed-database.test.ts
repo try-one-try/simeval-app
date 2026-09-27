@@ -1,11 +1,11 @@
 // 独立测试库验收：真实迁移和两次 Seed 后，固定故事的标识、数量与关系保持稳定。
 import { existsSync } from "node:fs";
 import { execSync } from "node:child_process";
-import { PrismaMariaDb } from "@prisma/adapter-mariadb";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { compare } from "bcryptjs";
 import { PrismaClient } from "../../src/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
-import { parseDatabaseUrl } from "../../src/lib/database-url";
+import { parseDatabaseUrl, databasePoolConfig } from "../../src/lib/database-url";
 import { isDemoAccount } from "../../src/lib/demo-identity";
 
 vi.mock("server-only", () => ({}));
@@ -15,7 +15,7 @@ if (existsSync(".env.test.local")) process.loadEnvFile(".env.test.local");
 
 const testUrl = process.env.TEST_DATABASE_URL;
 
-describe.skipIf(!testUrl)("独立 MySQL 测试库", () => {
+describe.skipIf(!testUrl)("独立 PostgreSQL 测试库", () => {
   it("应用已有迁移并重复 Seed，不复制预置故事", async () => {
     if (!testUrl) throw new Error("TEST_DATABASE_URL is required");
     const testConnection = parseDatabaseUrl(testUrl);
@@ -24,10 +24,10 @@ describe.skipIf(!testUrl)("独立 MySQL 测试库", () => {
     }
     if (!process.env.DEMO_PASSWORD) throw new Error("DEMO_PASSWORD is required for Seed");
 
-    const environment = { ...process.env, DATABASE_URL: testUrl };
+    const environment = { ...process.env, DATABASE_URL: testUrl, DIRECT_URL: testUrl, DATABASE_URL_UNPOOLED: testUrl };
     execSync("npm run db:deploy", { env: environment, stdio: "pipe", timeout: 60_000 });
 
-    const db = new PrismaClient({ adapter: new PrismaMariaDb({ ...testConnection, connectionLimit: 2 }) });
+    const db = new PrismaClient({ adapter: new PrismaPg(databasePoolConfig(testUrl, 2)) });
     const originalDatabaseUrl = process.env.DATABASE_URL;
     try {
       const snapshot = async () => ({
@@ -38,13 +38,14 @@ describe.skipIf(!testUrl)("独立 MySQL 测试库", () => {
         report: await db.aIReport.findUnique({ where: { id: "demo-report-confirmed" }, select: { id: true, runId: true, baselineRunId: true } }),
       });
 
-      // 直接导入同一个 Seed 文件，避开受限终端中 tsx 子进程的 os.userInfo() 错误。
+      // 直接调用共用数据函数，测试事务始终使用独立库，不读取 CLI 的直连配置。
       process.env.DATABASE_URL = testUrl;
       vi.resetModules();
-      await import("../../prisma/seed");
+      const { seedDefaultData } = await import("../../prisma/seed-data");
+      await db.$transaction(tx => seedDefaultData(tx, process.env.DEMO_PASSWORD!), { timeout: 60_000 });
       const first = await snapshot();
       vi.resetModules();
-      await import("../../prisma/seed");
+      await db.$transaction(tx => seedDefaultData(tx, process.env.DEMO_PASSWORD!), { timeout: 60_000 });
       const second = await snapshot();
 
       expect(second).toEqual(first);
@@ -126,7 +127,7 @@ describe.skipIf(!testUrl)("独立 MySQL 测试库", () => {
 
   it("增量补演示保留人工修改、同名用户任务与软删除，不重写结果或审计", async () => {
     if (!testUrl || parseDatabaseUrl(testUrl).database !== "simeval_test") throw new Error("Only simeval_test is allowed");
-    const db = new PrismaClient({ adapter: new PrismaMariaDb({ ...parseDatabaseUrl(testUrl), connectionLimit: 2 }) });
+    const db = new PrismaClient({ adapter: new PrismaPg(databasePoolConfig(testUrl, 2)) });
     const { seedCatalog } = await import("../../prisma/catalog");
     const clean = await db.evaluationRun.findUniqueOrThrow({ where: { id: "demo-run-clean" }, include: { metricResults: true } });
     const sample = await db.anomalySample.findUniqueOrThrow({ where: { id: "demo-run-evidence-review-sample-017" } });

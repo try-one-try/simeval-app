@@ -1,4 +1,4 @@
-// 独立 MySQL 验证复核事务、并发和旧报告标记；仅清理本文件的任务。
+// 独立 PostgreSQL 验证复核事务、并发和旧报告标记；仅清理本文件的任务。
 import {existsSync} from "node:fs";
 import {execSync} from "node:child_process";
 import {randomUUID} from "node:crypto";
@@ -26,8 +26,12 @@ describe.skipIf(!testUrl)("对比与复核真实数据库",()=>{
  }
  beforeAll(async()=>{
   if(!testUrl||parseDatabaseUrl(testUrl).database!=="simeval_test"||testUrl===original)throw new Error("必须使用独立测试库");
-  execSync("npm run db:deploy",{env:{...process.env,DATABASE_URL:testUrl},stdio:"pipe",timeout:60000});
-  process.env.DATABASE_URL=testUrl;vi.resetModules();await import("../../prisma/seed");
+  execSync("npm run db:deploy",{env:{...process.env,DATABASE_URL:testUrl,DIRECT_URL:testUrl,DATABASE_URL_UNPOOLED:testUrl},stdio:"pipe",timeout:60000});
+  process.env.DATABASE_URL=testUrl;vi.resetModules();
+  db=(await import("@/server/db")).getDb();
+  const {seedDefaultData}=await import("../../prisma/seed-data");
+  if(!process.env.DEMO_PASSWORD)throw new Error("DEMO_PASSWORD is required");
+  await db.$transaction(tx=>seedDefaultData(tx,process.env.DEMO_PASSWORD!),{timeout:60_000});
   db=(await import("@/server/db")).getDb();repo=(await import("@/server/repositories/comparison-review-repository")).comparisonReviewRepository;
   evaluation=(await import("@/server/repositories/evaluation-repository")).evaluationRepository;
  },120000);

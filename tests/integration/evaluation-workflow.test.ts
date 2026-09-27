@@ -1,4 +1,4 @@
-// 真实 MySQL 验证事务与并发；只连接独立测试库，只清理本文件创建的记录。
+// 真实 PostgreSQL 验证事务与并发；只连接独立测试库，只清理本文件创建的记录。
 import { existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
@@ -21,8 +21,12 @@ describe.skipIf(!testUrl)("评测真实数据库事务",()=>{
   const at=(run:{createdAt:Date},ms:number)=>new Date(run.createdAt.getTime()+ms);
   beforeAll(async()=>{
     if(!testUrl || parseDatabaseUrl(testUrl).database!=="simeval_test" || testUrl===original)throw new Error("必须使用独立 simeval_test");
-    execSync("npm run db:deploy",{env:{...process.env,DATABASE_URL:testUrl},stdio:"pipe",timeout:60000});
-    process.env.DATABASE_URL=testUrl;vi.resetModules();await import("../../prisma/seed");
+    execSync("npm run db:deploy",{env:{...process.env,DATABASE_URL:testUrl,DIRECT_URL:testUrl,DATABASE_URL_UNPOOLED:testUrl},stdio:"pipe",timeout:60000});
+    process.env.DATABASE_URL=testUrl;vi.resetModules();
+  db=(await import("@/server/db")).getDb();
+  const {seedDefaultData}=await import("../../prisma/seed-data");
+  if(!process.env.DEMO_PASSWORD)throw new Error("DEMO_PASSWORD is required");
+  await db.$transaction(tx=>seedDefaultData(tx,process.env.DEMO_PASSWORD!),{timeout:60_000});
     repository=(await import("@/server/repositories/evaluation-repository")).evaluationRepository;
     service=(await import("@/server/application/evaluation")).evaluationService;
     db=(await import("@/server/db")).getDb();
