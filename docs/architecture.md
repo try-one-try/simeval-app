@@ -60,7 +60,7 @@ flowchart LR
 | 对象 | 目标变化 |
 |---|---|
 | EvaluationRun | 新建 name 必填、baselineRunId 可空；已加 targetSuccessRate（可空 0.8／0.85）、configurationSnapshot、deletedAt／deletedById |
-| 模型／数据／Benchmark 目录 | 兼容矩阵与模拟参数统一在 domain/evaluation-catalog.ts；prisma/catalog.ts 只补缺失目录和历史合成基线，完整 Seed 调用它，db:catalog 不覆盖已有记录 |
+| 模型／数据／Benchmark 目录 | 兼容矩阵与命名统一在 domain/evaluation-catalog.ts；catalog.ts 补目录后调用 demo-fixtures.ts，完整 Seed／db:catalog 共用，保留已有结果、人工内容和删除状态 |
 | AnomalySample | 已分开 draftConclusion 与已确认 conclusion，保存修改人／时间、confirmedById／confirmedAt 和 confirmedRevision；现有 version 用于所有编辑防覆盖 |
 | ReviewRecord | 只追加每次草稿／确认／修改的内容、操作者、时间与来源版本，不要求人工分类 |
 | AIReport | 输入快照保存指标、证据和 sourceReviewVersions（样本 ID → 确认版本）；已加 isStale／staleAt；生成与确认尚未实现。过时报告保留原确认历史，当前入口提示重生成 |
@@ -71,7 +71,7 @@ flowchart LR
 
 ## 5. 当前可运行行为与写入保护
 
-质量／评测十个操作包含目录、质量、创建／列表／详情、状态、同步、取消、重试和软删除。创建保存 mock-v2 参数快照；结果独立于基线，保留四项指标和两条预置证据片段。模型与难度改变指标，Seed／Episode 产生确定性偏移；目标仅判断达标，不改变结果。
+质量／评测十个操作包含目录、质量、创建／列表／详情、状态、同步、取消、重试和软删除。创建保存 mock-v2 参数快照；结果独立于基线，保留四项指标和两条预置证据片段。模型与难度改变指标，Seed／Episode 产生确定性偏移；目标仅判断达标，不改变结果。纯计算集中在 domain/simulation-results.ts，执行 Provider 与演示 Seed 共用，客户端不导入该 Node.js 模块。
 
 - GET 只读；POST sync 按服务器时间每次推进一段，创建后满 1 秒可运行、满 4 秒可完成，没有后台执行。运行中 progress 为 null。
 - 成功的指标、异常、终态和审计同事务提交，重复同步不重复写。

@@ -13,6 +13,7 @@ AIReport 只加 isStale／staleAt，最终改变后保守标记关联候选或�
 复核先锁 EvaluationRun，确认未软删除且成功，再用 sample.version 条件更新；历史、审计、报告过时同事务。更新竞争返回 409 VERSION_CONFLICT，输入保留。草稿不替换最终内容，确认修订号与编辑 version 分开。
 
 ## 3. 交互与 API
+返回导航复用 `task-flow-back-link.tsx` 与次级按钮 token，放在标题上方左侧；主操作保留在内容后。`review-links.ts` 统一结果／比较／异常／报告 URL；结果页读取并校验 baselineRunId，回到比较时恢复显式选择（含空值“不比较”）。报告返回保留异常场景／指标／复核筛选；身份边界不变。
 比较查询必填 candidateRunId、可选 baselineRunId／scenarioKey，输出当前指标、可比差值、基线选项与证据数量。异常查询必填 runId，可按 metricKey、scenarioKey、status、reviewState、page／pageSize 筛选；详情可附 runId 核对归属。PATCH review 接受 conclusion、mode=draft|confirm、expectedVersion。
 增量目录以稳定 ID／upsert 只补两个历史模型与成功任务、每任务四指标；不覆盖已有记录，不重跑开发库完整 Seed。完成页按角色继续当前任务；等待／执行使用不确定进度条和已用时间，不伪造百分比，正常流程无刷新按钮，同步出错时提供重新连接；取消紧邻进度。复核示例只根据当前日志填表，不写库。
 工程师的对比页保留显式基线与上下文；评测人员直访对比仍拒绝。复核界面显示草稿和最终两个区块；两身份都有明显编辑入口，评测人员才能最终确认。

@@ -1,5 +1,6 @@
 // 增量补目录与历史基线；只迁移旧默认名称，保留自定义名称、指标和复核。
 import type { PrismaClient } from "../src/generated/prisma/client";
+import { seedDemoScenarios } from "./demo-fixtures";
 import { PROJECT_ID, models, datasets, benchmarks, metricCatalog, metricId, DEMO_RUN_NAMES } from "../src/domain/evaluation-catalog";
 export async function seedCatalog(db: PrismaClient) {
   await db.$transaction(async tx => {
@@ -53,4 +54,5 @@ export async function seedCatalog(db: PrismaClient) {
     for (const id of ["demo-run-baseline", "demo-run-candidate"] as const)
       await tx.evaluationRun.updateMany({ where: { id, name: null }, data: { name: DEMO_RUN_NAMES[id] } });
   });
+  await seedDemoScenarios(db);
 }

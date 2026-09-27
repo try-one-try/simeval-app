@@ -7,6 +7,7 @@ import { isActive, type Actor } from "@/domain/evaluation";
 import type { RunData } from "@/lib/evaluation-dto";
 import { apiRequest, ClientError, errorText } from "@/lib/api-client";
 import { RunContext, RunResults } from "./run-context";
+import { comparisonHref, evidenceHref } from "@/lib/review-links";
 type StatusData = { status: RunData["status"] };
 // Provider 不提供逐 Episode 进度：动效只表示活动，计时不推算完成百分比。
 function ExecutionActivity({ run, paused, canCancel, onCancel, cancelRef, busy }: {
@@ -29,7 +30,7 @@ function ExecutionActivity({ run, paused, canCancel, onCancel, cancelRef, busy }
   </div>;
 }
 const labels = { QUEUED: "等待执行", RUNNING: "执行中", SUCCEEDED: "已完成", FAILED: "执行失败", CANCELLED: "已取消" };
-export function TaskStatus({ initialRun, actor }: { initialRun: RunData; actor: Actor }) {
+export function TaskStatus({ initialRun, actor, baselineRunId }: { initialRun: RunData; actor: Actor; baselineRunId?: string }) {
   const router = useRouter();
   const [run, setRun] = useState(initialRun);
   const [error, setError] = useState("");
@@ -94,7 +95,7 @@ export function TaskStatus({ initialRun, actor }: { initialRun: RunData; actor: 
     <dl className="facts mobile-task-facts">{active && <div><dt>模型</dt><dd>{run.modelName} {run.modelVersion}</dd></div>}<div><dt>Episode</dt><dd>{run.episodeCount}</dd></div>{!active && <div><dt>模拟 Seed</dt><dd>{run.simulationSeed}</dd></div>}<div><dt>进度</dt><dd>已排队 → {run.status === "QUEUED" ? "等待执行" : run.status === "RUNNING" ? "执行中" : run.status === "CANCELLED" ? "已取消" : run.status === "FAILED" ? "执行失败" : "已执行"} → {run.status === "SUCCEEDED" ? "已生成结果" : "无结果"}</dd></div></dl>
     <div className="workflow-actions">
       {!active && (run.status === "FAILED" && canWrite && !run.isDemoFixture ? <><button className="primary-button" onClick={retry} disabled={busy}>{busy ? "正在创建…" : "创建重试任务 →"}</button><Link className="text-action" href="/evaluations/new">重新配置 ↗</Link></>
-        : run.status === "SUCCEEDED" ? <><Link className="primary-button" href={(actor.role === "ENGINEER" ? "/comparisons" : "/anomalies") + "?runId=" + run.id}>{actor.role === "ENGINEER" ? "进入模型对比 →" : "进入异常复核 →"}</Link>{actor.role === "ENGINEER" && <Link className="text-action" href="/evaluations/new">新建评测 ↗</Link>}</>
+        : run.status === "SUCCEEDED" ? <><Link className="primary-button" href={actor.role === "ENGINEER" ? comparisonHref(run.id,baselineRunId) : evidenceHref(run.id,{baselineRunId})}>{actor.role === "ENGINEER" ? "进入模型对比 →" : "进入异常复核 →"}</Link>{actor.role === "ENGINEER" && <Link className="text-action" href="/evaluations/new">新建评测 ↗</Link>}</>
         : actor.role === "ENGINEER" ? <Link className="primary-button" href="/evaluations/new">重新配置评测 →</Link> : <Link className="primary-button" href="/evaluations">返回评测任务 →</Link>)}
     </div>
     {run.retryOfRunId && <p className="fine-print">这是独立的重试任务；<Link className="inline-link" href={"/evaluations/" + run.retryOfRunId}>查看原失败记录 ↗</Link></p>}

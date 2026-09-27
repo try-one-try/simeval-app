@@ -5,19 +5,21 @@ import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import type { ComparisonData } from "@/lib/review-dto";
 import type { ComparisonMetric } from "@/domain/comparison-review";
-import { comparisonHref,evidenceHref,scenarioLabel } from "@/lib/review-links";
+import { comparisonHref,evidenceHref,resultsHref,scenarioLabel } from "@/lib/review-links";
 import { RunContext } from "@/features/evaluation/run-context";
+import { TaskFlowBackLink } from "@/features/evaluation/task-flow-back-link";
 const verdictLabels={IMPROVEMENT:"改善",REGRESSION:"回退",UNCHANGED:"持平",NOT_COMPARABLE:"不可比",CURRENT_ONLY:"本次结果"};
 function formatted(value:number|null,unit:string) {return value===null?"—":value+unit;}
 function Delta({metric}:{metric:ComparisonMetric}) {return <span className={metric.verdict==="REGRESSION"?"risk-text":""}>{metric.delta===null?verdictLabels[metric.verdict]:(metric.delta>0?"+":"")+metric.delta+" "+metric.deltaUnit+" · "+verdictLabels[metric.verdict]}</span>;}
 export function ComparisonView({data}:{data:ComparisonData}) {
   const router=useRouter(),run=data.candidate,metricsDetails=useRef<HTMLDetailsElement>(null);
   const risk=data.metrics.some(m=>m.verdict==="REGRESSION"),improved=data.metrics.some(m=>m.verdict==="IMPROVEMENT"),incomplete=data.metrics.some(m=>m.verdict==="NOT_COMPARABLE");
-  const conclusion=!data.baseline?"本次评测已完成，可选择历史基线比较。":incomplete?"部分指标口径不一致，请分别核对。":risk&&improved?"改善伴随风险，需要核对异常证据。":risk?"存在指标回退，需要核对异常证据。":improved?"指标有所改善，仍需结合证据判断。":"可比指标保持一致。";
+  const currentOnlyConclusion=data.baselines.length?"本次评测已完成，可选择历史基线比较。":"本次评测已完成，暂无同口径历史基线。";
+  const conclusion=!data.baseline?currentOnlyConclusion:incomplete?"部分指标口径不一致，请分别核对。":risk&&improved?"改善伴随风险，需要核对异常证据。":risk?"存在指标回退，需要核对异常证据。":improved?"指标有所改善，仍需结合证据判断。":"可比指标保持一致。";
   const featured=[data.metrics.find(m=>m.key==="success_rate"&&m.scenarioKey==="__overall__"),data.metrics.find(m=>m.key==="collision_rate")].filter((m):m is ComparisonMetric=>!!m);
   const context={baselineRunId:data.baseline?.id??""};
   return <main className="content workflow-content comparison-view"><RunContext run={run} href="/comparisons"/>
-    <p className="page-context">模型对比 / 02 版本指标</p>
+    <div className="page-context task-flow-header"><TaskFlowBackLink href={resultsHref(run.id,context.baselineRunId)} label="返回评测结果"/><span>模型对比 / 02 版本指标</span></div>
     <div className="overview-heading"><div><h1>模型对比</h1><p className="muted">同口径历史结果对比；不选基线时仅查看本次指标。</p></div><div className="comparison-conditions"><p className="fine-print">统一评测条件</p><p>{run.datasetName} {run.datasetVersion}</p><p className="fine-print">{run.episodeCount} Episodes · Seed {run.simulationSeed}</p></div></div>
     <div className="conclusion"><p>关键结论</p><h2>{conclusion}</h2><p className="muted">这是指标判读，不是原因定论或发布建议；需由人工结合日志复核。</p></div>
     <label className="baseline-selector">比较基线 <span className="baseline-count">· {data.baselines.length} 个可选历史任务</span><select value={data.baseline?.id??""} onChange={e=>router.push(comparisonHref(run.id,e.target.value))}><option value="">不对比历史结果</option>{data.baseline&&!data.baselines.some(b=>b.id===data.baseline!.id)&&<option value={data.baseline.id}>{data.baseline.name} · 已隐藏的原引用</option>}{data.baselines.map(b=><option key={b.id} value={b.id}>{b.name} · {b.modelVersion}</option>)}</select><span className="fine-print">可不选。仅列同口径、不同模型的成功任务；选择只改变查看条件。</span></label>

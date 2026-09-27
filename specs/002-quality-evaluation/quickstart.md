@@ -17,7 +17,7 @@ npm run db:catalog
 npm run dev
 ~~~
 
-generate 更新数据库访问代码；deploy 追加迁移；catalog 只补可选目录，保留已有故事和任务；dev 启动网页。新环境的完整 Seed 已含目录，不必再单独 catalog。以后平时只需 dev，不重复初始化。
+generate 更新数据库访问代码；deploy 追加迁移；catalog 增量补目录与十条核心示例，保留已有结果、人工结论和删除状态；dev 启动网页。新环境的完整 Seed 已含目录和示例，不必再单独 catalog。以后平时只需 dev，不重复初始化。
 
 访问 http://localhost:3000/login。若还在运行旧 Prisma Client，刷新网页无法解决；必须重启原服务。
 

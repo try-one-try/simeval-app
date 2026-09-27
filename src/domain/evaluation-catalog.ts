@@ -10,6 +10,12 @@ export const DEMO_RUN_NAMES = {
   "demo-run-candidate": "Warehouse Candidate v2.4",
   "demo-run-v21": "Warehouse Reference v2.1",
   "demo-run-v22": "Warehouse Reference v2.2",
+  "demo-run-evidence-review": "Warehouse Evidence Review v2.4",
+  "demo-run-recovery-test": "Warehouse Recovery Test v2.4",
+  "demo-run-recovery-retry": "Warehouse Recovery Retry v2.4",
+  "demo-run-cancellation": "Warehouse Cancellation Test v2.5",
+  "demo-run-clean": "Warehouse Clean Evaluation v2.5",
+  "demo-run-occlusion": "Occlusion Stress Evaluation v2.5",
 } as const;
 export const models = [
   { id: "demo-model-v21", name: MODEL_FAMILY_NAME, version: "v2.1", selectable: false, success: 70, collision: 11, duration: 13.8, intervention: 8 },

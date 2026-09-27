@@ -23,6 +23,10 @@ button:disabled { cursor:not-allowed; }
 .primary-button:disabled { opacity:.5; }
 .secondary-button { border-color:var(--line); background:white; }
 .secondary-button:hover { background:var(--canvas); }
+/* 同任务返回固定在标题上方；44px 点击区与深色文字保证可发现性。 */
+.page-context.task-flow-header { align-items:center; flex-wrap:wrap; gap:16px; margin-bottom:32px; }
+.task-flow-back-link { gap:10px; padding:10px 16px; font-size:14px; font-weight:600; color:var(--ink); }
+.task-flow-header .task-flow-back-link > span { color:inherit; font-size:18px; }
 .mobile-only,.menu-trigger,.mobile-overview-facts { display:none; }
 .site-header { height:77px; padding:0 64px; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; max-width:1600px; margin:auto; }
 .landing-nav { display:flex; align-items:center; gap:64px; font-size:13px; }

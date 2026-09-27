@@ -50,7 +50,7 @@ describe.skipIf(!testUrl)("独立 MySQL 测试库", () => {
       expect(second).toEqual(first);
       expect(second.users).toHaveLength(3);
       expect(second.project?.id).toBe("demo-project-warehouse");
-      expect(second.runs).toHaveLength(4);
+      expect(second.runs).toHaveLength(10);
       expect(second.runs.every(run => !!run.name && !/[\u3400-\u9fff]/.test(run.name))).toBe(true);
       const modelNames = await db.modelVersion.findMany({ where: { projectId: "demo-project-warehouse" }, select: { name: true } });
       expect(modelNames.every(model => model.name === "PickPlace Policy")).toBe(true);
@@ -68,13 +68,29 @@ describe.skipIf(!testUrl)("独立 MySQL 测试库", () => {
         await seedCatalog(db);
         expect((await db.evaluationRun.findUniqueOrThrow({ where: { id: historicalId } })).name).toBe("保留已有名称");
         expect(Number((await db.metricResult.findUniqueOrThrow({ where: { id: result.id } })).value)).toBe(69);
-        expect(await db.evaluationRun.count({ where: { isDemoFixture: true } })).toBe(4);
+        expect(await db.evaluationRun.count({ where: { isDemoFixture: true } })).toBe(10);
       } finally {
         await db.evaluationRun.update({ where: { id: historicalId }, data: { name: historical.name } });
         await db.metricResult.update({ where: { id: result.id }, data: { value: result.value } });
       }
       expect(second.samples).toHaveLength(2);
       expect(second.report).toEqual({ id: "demo-report-confirmed", runId: "demo-run-candidate", baselineRunId: "demo-run-baseline" });
+      const clean = await db.evaluationRun.findUniqueOrThrow({ where: { id: "demo-run-clean" }, include: { datasetVersion: true, metricResults: { include: { metricDefinition: true } } } });
+      const occlusion = await db.evaluationRun.findUniqueOrThrow({ where: { id: "demo-run-occlusion" }, include: { metricResults: { include: { metricDefinition: true } } } });
+      const success = (run: typeof occlusion) => Number(run.metricResults.find(metric => metric.metricDefinition.key === "success_rate")!.value);
+      expect(clean.datasetVersion.qualityStatus).toBe("PASSED");
+      expect(clean.modelVersionId).toBe("demo-model-v25");
+      expect(success(clean)).toBe(87);
+      expect(success(clean)).toBeGreaterThanOrEqual(Number(clean.targetSuccessRate) * 100);
+      expect(occlusion.benchmarkId).toBe("demo-benchmark-occlusion-v1");
+      expect(success(occlusion)).toBe(78);
+      expect(success(occlusion)).toBeLessThan(Number(occlusion.targetSuccessRate) * 100);
+      expect(occlusion.metricResults.find(metric => metric.metricDefinition.key === "collision_rate")?.sampleCount).toBe(200);
+      expect((await db.evaluationRun.findUniqueOrThrow({ where: { id: "demo-run-recovery-retry" } })).retryOfRunId).toBe("demo-run-recovery-test");
+      const reviewSamples = await db.anomalySample.findMany({ where: { runId: "demo-run-evidence-review" }, orderBy: { sampleNumber: "asc" } });
+      expect(reviewSamples.map(sample => sample.status)).toEqual(["RESOLVED", "OPEN"]);
+      expect(reviewSamples[0].confirmedRevision).toBe(2);
+      expect(await db.reviewRecord.count({ where: { anomalySampleId: reviewSamples[0].id } })).toBe(2);
       // 验证页面实际使用的关系查询，而不只检查表中存在固定 ID。
       const { overviewRepository } = await import("../../src/server/repositories/overview-repository");
       const { getDb } = await import("../../src/server/db");
@@ -107,4 +123,39 @@ describe.skipIf(!testUrl)("独立 MySQL 测试库", () => {
       await db.$disconnect();
     }
   }, 180_000);
+
+  it("增量补演示保留人工修改、同名用户任务与软删除，不重写结果或审计", async () => {
+    if (!testUrl || parseDatabaseUrl(testUrl).database !== "simeval_test") throw new Error("Only simeval_test is allowed");
+    const db = new PrismaClient({ adapter: new PrismaMariaDb({ ...parseDatabaseUrl(testUrl), connectionLimit: 2 }) });
+    const { seedCatalog } = await import("../../prisma/catalog");
+    const clean = await db.evaluationRun.findUniqueOrThrow({ where: { id: "demo-run-clean" }, include: { metricResults: true } });
+    const sample = await db.anomalySample.findUniqueOrThrow({ where: { id: "demo-run-evidence-review-sample-017" } });
+    const occlusion = await db.evaluationRun.findUniqueOrThrow({ where: { id: "demo-run-occlusion" } });
+    const metric = clean.metricResults[0];
+    const duplicate = await db.evaluationRun.create({ data: { name: clean.name, projectId: clean.projectId, modelVersionId: clean.modelVersionId,
+      datasetVersionId: clean.datasetVersionId, benchmarkId: clean.benchmarkId, status: "SUCCEEDED", createdById: clean.createdById,
+      provider: clean.provider, episodeCount: clean.episodeCount, simulationSeed: clean.simulationSeed } });
+    try {
+      await db.evaluationRun.update({ where: { id: clean.id }, data: { isDemoFixture: false } });
+      await db.metricResult.update({ where: { id: metric.id }, data: { value: 88 } });
+      await db.anomalySample.update({ where: { id: sample.id }, data: { draftConclusion: "人工保存的草稿", conclusion: "人工修改的最终结论", version: 7 } });
+      await db.evaluationRun.update({ where: { id: occlusion.id }, data: { deletedAt: new Date(), deletedById: "demo-user-engineer" } });
+      await seedCatalog(db);
+      const auditCount = await db.auditLog.count({ where: { requestId: "demo-core-fixtures-v1" } });
+      await seedCatalog(db);
+      expect(await db.evaluationRun.count({ where: { isDemoFixture: true } })).toBe(10);
+      expect(await db.auditLog.count({ where: { requestId: "demo-core-fixtures-v1" } })).toBe(auditCount);
+      expect((await db.evaluationRun.findUniqueOrThrow({ where: { id: duplicate.id } })).isDemoFixture).toBe(false);
+      expect(Number((await db.metricResult.findUniqueOrThrow({ where: { id: metric.id } })).value)).toBe(88);
+      expect(await db.anomalySample.findUniqueOrThrow({ where: { id: sample.id } })).toMatchObject({ draftConclusion: "人工保存的草稿", conclusion: "人工修改的最终结论", version: 7 });
+      expect((await db.evaluationRun.findUniqueOrThrow({ where: { id: occlusion.id } })).deletedAt).not.toBeNull();
+    } finally {
+      await db.evaluationRun.update({ where: { id: clean.id }, data: { isDemoFixture: clean.isDemoFixture } });
+      await db.metricResult.update({ where: { id: metric.id }, data: { value: metric.value } });
+      await db.anomalySample.update({ where: { id: sample.id }, data: { draftConclusion: sample.draftConclusion, conclusion: sample.conclusion, version: sample.version } });
+      await db.evaluationRun.update({ where: { id: occlusion.id }, data: { deletedAt: occlusion.deletedAt, deletedById: occlusion.deletedById } });
+      await db.evaluationRun.delete({ where: { id: duplicate.id } });
+      await db.$disconnect();
+    }
+  }, 60000);
 });
