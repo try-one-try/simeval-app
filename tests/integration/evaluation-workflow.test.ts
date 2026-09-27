@@ -2,7 +2,7 @@
 import { existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { beforeAll, afterAll, describe, expect, it, vi } from "vitest";
+import { beforeAll, afterAll, afterEach, describe, expect, it, vi } from "vitest";
 import { parseDatabaseUrl } from "@/lib/database-url";
 import type { CreateRunInput, Actor } from "@/domain/evaluation";
 vi.mock("server-only",()=>({}));
@@ -27,13 +27,14 @@ describe.skipIf(!testUrl)("评测真实数据库事务",()=>{
     service=(await import("@/server/application/evaluation")).evaluationService;
     db=(await import("@/server/db")).getDb();
   },120000);
+  afterEach(async()=>{if(db) await db.evaluationRun.updateMany({where:{id:{in:ids},status:{in:["QUEUED","RUNNING"]}},data:{status:"CANCELLED",finishedAt:new Date()}});});
   afterAll(async()=>{
     if(db){
       await db.$transaction(async(tx)=>{
         await tx.auditLog.deleteMany({where:{entityType:"EvaluationRun",entityId:{in:ids}}});
         await tx.metricResult.deleteMany({where:{runId:{in:ids}}});
         await tx.anomalySample.deleteMany({where:{runId:{in:ids}}});
-        await tx.evaluationRun.updateMany({where:{id:{in:ids}},data:{retryOfRunId:null}});
+        await tx.evaluationRun.updateMany({where:{id:{in:ids}},data:{retryOfRunId:null,baselineRunId:null}});
         await tx.evaluationRun.deleteMany({where:{id:{in:ids}}});
       });
       await db.$disconnect();
@@ -95,4 +96,45 @@ describe.skipIf(!testUrl)("评测真实数据库事务",()=>{
     expect(await db.anomalySample.count({where:{runId:run.id}})).toBe(latest?.status==="SUCCEEDED"?2:0);
     expect(await db.auditLog.count({where:{entityId:run.id,action:{in:["EVALUATION_SUCCEEDED","EVALUATION_CANCELLED"]}}})).toBe(1);
   });
+  it("无基线执行、两模型与不同基准产生独立结果，保留目标快照",async()=>{
+    const first=await create({baselineRunId:null,targetSuccessRate:.8});
+    const second=await create({baselineRunId:null,modelVersionId:"demo-model-v25",benchmarkId:"demo-benchmark-occlusion-v1",episodeCount:300,simulationSeed:42});
+    for(const run of [first,second]){await repository.sync(actor,run.id,at(run,3000));await repository.sync(actor,run.id,at(run,13000));}
+    const a=await service.get(actor,first.id),b=await service.get(actor,second.id);
+    expect(a.baselineRunId).toBeNull();expect(a.targetSuccessRate).toBe(.8);expect(a.metrics.find(m=>m.key==="success_rate")?.value).toBe(81);
+    expect(a.metrics).not.toEqual(b.metrics);expect(b.metrics.find(m=>m.key==="collision_rate")?.sampleCount).toBe(300);
+    expect(first.configurationSnapshot).toMatchObject({algorithm:"mock-v2",episodeCount:200});
+    const passed=await create({baselineRunId:null,datasetVersionId:"demo-dataset-clean-v1",acceptQualityWarning:false});expect(passed.status).toBe("QUEUED");
+    await expect(create({baselineRunId:null,datasetVersionId:"demo-dataset-clean-v1",benchmarkId:"demo-benchmark-occlusion-v1"})).rejects.toMatchObject({code:"INCOMPATIBLE_CONFIGURATION"});
+  });
+  it("不同幂等键并发不能突破三个活跃任务，重复提交不占容量",async()=>{
+    const keys=[0,1,2,3].map(()=>randomUUID());
+    const outcomes=await Promise.allSettled(keys.map(key=>repository.create(actor,{...input,baselineRunId:null},key)));
+    const successful=outcomes.flatMap(o=>o.status==="fulfilled"?[o.value]:[]);ids.push(...successful.map(o=>o.run.id));
+    expect(successful).toHaveLength(3);
+    const index=outcomes.findIndex(o=>o.status==="fulfilled");expect((await repository.create(actor,{...input,baselineRunId:null},keys[index])).replay).toBe(true);expect(outcomes.filter(o=>o.status==="rejected")).toHaveLength(1);
+    const rejected=outcomes.find(o=>o.status==="rejected");expect(rejected?.status==="rejected" && rejected.reason.code).toBe("TASK_LIMIT_REACHED");
+    await repository.cancel(actor,successful[0].run.id);const next=await create({baselineRunId:null});expect(next.status).toBe("QUEUED");
+  });
+  it("软删除幂等、列表隐藏且外键和结果保留；越权、进行中和示例不能删除",async()=>{
+    const first=await create({baselineRunId:null});
+    await expect(repository.remove(actor,first.id)).rejects.toMatchObject({status:409});
+    await repository.sync(actor,first.id,at(first,3000));await repository.sync(actor,first.id,at(first,13000));
+    const linked=await create({modelVersionId:"demo-model-v25",baselineRunId:first.id});
+    const failedRef=await create({modelVersionId:"demo-model-v25",baselineRunId:first.id,mockFailure:true});
+    await expect(repository.remove({...actor,role:"REVIEWER"},first.id)).rejects.toMatchObject({status:403});
+    await expect(repository.remove({...actor,id:"demo-user-reviewer"},first.id)).rejects.toMatchObject({status:403});
+    const deleted=await repository.remove(actor,first.id);expect(await repository.remove(actor,first.id)).toEqual(deleted);
+    await expect(service.get(actor,first.id)).rejects.toMatchObject({status:404});
+    expect((await repository.list({page:1,pageSize:100})).runs.some(r=>r.id===first.id)).toBe(false);
+    expect(await db.metricResult.count({where:{runId:first.id}})).toBe(4);expect((await repository.get(linked.id))?.baselineRunId).toBe(first.id);
+    expect(await db.auditLog.count({where:{entityId:first.id,action:"EVALUATION_DELETED"}})).toBe(1);
+    await expect(repository.remove(actor,"demo-run-candidate")).rejects.toMatchObject({status:409});
+    await expect(create({modelVersionId:"demo-model-v25",baselineRunId:first.id})).rejects.toMatchObject({code:"NOT_FOUND"});
+    await repository.sync(actor,failedRef.id,at(failedRef,3000));await repository.sync(actor,failedRef.id,at(failedRef,13000));
+    const retried=await repository.retry(actor,failedRef.id,randomUUID());ids.push(retried.run.id);expect(retried.run.baselineRunId).toBe(first.id);
+    // 已保存快照的任务完成不再读取被隐藏的基线。
+    await repository.sync(actor,linked.id,at(linked,3000));expect((await repository.sync(actor,linked.id,at(linked,13000))).status).toBe("SUCCEEDED");
+  });
+
 });

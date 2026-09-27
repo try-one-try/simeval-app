@@ -5,3 +5,6 @@ import { evaluationService } from "@/server/application/evaluation";
 export function GET(request: Request, context: { params: Promise<{ runId: string }> }) {
   return api(request, async (actor) => ({ data: await evaluationService.get(actor, parse(idSchema, (await context.params).runId)) }));
 }
+export function DELETE(request: Request, context: { params: Promise<{ runId: string }> }) {
+  return api(request, async actor => ({ data: await evaluationService.remove(actor, parse(idSchema, (await context.params).runId)) }), ["ENGINEER"]);
+}

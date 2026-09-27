@@ -4,6 +4,7 @@ import { hash, compare } from "bcryptjs";
 import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { parseDatabaseUrl } from "../src/lib/database-url";
+import { seedCatalog } from "./catalog";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 
@@ -185,6 +186,7 @@ async function seedStory() {
 try {
   await seedUsers();
   await seedStory();
+  await seedCatalog(db);
   const counts = await Promise.all([
     db.project.count({ where: { slug: "warehouse-manipulation" } }),
     db.evaluationRun.count({ where: { isDemoFixture: true, projectId: "demo-project-warehouse" } }),

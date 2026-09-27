@@ -1,4 +1,5 @@
-import { WorkspaceNotice } from "@/components/workspace-notice";
-export default function ReportsPage() {
-  return <WorkspaceNotice title="评测报告" description="报告生成与人工确认尚未开放。已有任务和结果会保留，报告功能将在复核接通后开放。" />;
+// 模块入口复用单选任务流程；带 runId 时直接打开同一任务。
+import { ModuleEntry, type ModuleParams } from "@/features/evaluation/module-entry";
+export default function Page({ searchParams }: { searchParams: ModuleParams }) {
+  return <ModuleEntry module="reports" searchParams={searchParams} />;
 }

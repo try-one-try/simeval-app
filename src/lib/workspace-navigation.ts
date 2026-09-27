@@ -6,7 +6,7 @@ const items = {
   compare: { label: "模型对比", description: "版本差异与指标 · 未开放", href: "/comparisons" },
   review: { label: "异常复核", description: "证据与人工结论 · 未开放", href: "/anomalies" },
   reports: { label: "报告", description: "结论与人工确认 · 未开放", href: "/reports" },
-  overview: { label: "总览", description: "当前展示固定演示故事", href: "/overview" },
+  overview: { label: "总览", description: "所选任务的结果与进度", href: "/overview" },
 } as const;
 export function workspaceItems(role: DemoRole) {
   return (role === "ENGINEER" ? ["create", "tasks", "compare", "review", "reports", "overview"] as const

@@ -6,7 +6,8 @@ vi.mock("@/server/auth/require-viewer", () => ({ requireViewer: mocks.viewer }))
 vi.mock("@/server/application/evaluation", () => ({ evaluationService: { options: mocks.options } }));
 import { workspaceItems, isCurrentItem } from "@/lib/workspace-navigation";
 import NewEvaluationPage from "@/app/(workspace)/evaluations/new/page";
-import ComparisonsPage from "@/app/(workspace)/comparisons/page";
+vi.mock("server-only",()=>({}));
+import { ModuleEntry } from "@/features/evaluation/module-entry";
 beforeEach(() => { vi.clearAllMocks(); mocks.viewer.mockResolvedValue({ id: "reviewer", role: "REVIEWER" }); });
 it("两身份导航顺序与职责不同，总览均置底", () => {
   expect(workspaceItems("ENGINEER").map((item) => item.label)).toEqual(["创建评测", "评测任务", "模型对比", "异常复核", "报告", "总览"]);
@@ -19,6 +20,6 @@ it("创建页不同时高亮评测任务，详情不高亮创建", () => {
 });
 it("评测人员直访创建或对比显示无权限，不查询创建配置", async () => {
   expect(renderToStaticMarkup(await NewEvaluationPage())).toContain("当前身份无法创建评测");
-  expect(renderToStaticMarkup(await ComparisonsPage())).toContain("当前身份无法使用模型对比");
+  expect(renderToStaticMarkup(await ModuleEntry({module:"comparisons",searchParams:Promise.resolve({})}))).toContain("当前身份无法使用模型对比");
   expect(mocks.options).not.toHaveBeenCalled();
 });

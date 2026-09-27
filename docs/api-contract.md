@@ -2,34 +2,29 @@
 
 [OpenAPI](openapi.yaml) 是方法、字段与实现状态的权威契约。本文解释调用和取舍；认证会话由 Auth.js 管理，不把其内部路由算成业务 API。
 
-## 1. 先分清可调用与待实施
+## 1. 可调用与待实施
 
-**2026-09-27 接口版本 0.4.1。** 现有八个质量／评测操作保留第一版实际契约；新原型认可不等于接口已改造。
+**2026-09-27，接口版本 0.5.0。** 十个质量／评测操作已实现：目录、质量、创建／列表／详情、状态、同步、取消、重试和软删除。比较、异常复核和报告仍为 planned；指派／重开留后续细化。
 
-| 状态 | 内容 |
-|---|---|
-| implemented | 质量读取、任务创建／列表／详情、状态读取、同步、取消、重试 |
-| x-target-*（待改造） | 已有接口的新目标：可选基线、自主目录和目标值、过滤软删除 |
-| planned | 目录、软删除、比较、异常读取／结论编辑、报告生成／确认 |
-| needs-detail | 指派／重开保留后续草案，尚不纳入当前主线 |
-
-新产品只有 ENGINEER／REVIEWER。工程师管理本人任务、编辑草稿、生成／阅读报告；评测人员确认结论／报告。当前八项 implemented 已只接受两个预设账号会话，旧 ADMIN 会话返回 401；评测人员创建／取消／重试返回 403。创建仍必填 baselineRunId，其余自主配置与删除在后续改造。独立回补和人工分类已从计划接口移除，旧数据库历史保留。
+仅两个预设账号会话有效，旧 ADMIN 返回 401。工程师管理本人任务，评测人员只读任务；服务端拒绝越权写入。回补和人工分类退出当前产品，历史数据库关系保留。
 
 ## 2. 公共规则
 
-- **身份与写入**：校验 Session、预设账号 email／isDemo 和数据库角色；写入要求同源 Origin、Zod 与业务权限。当前八个操作写入均为 POST；后续 PATCH／DELETE 同样受保护。
-- **输入与分页**：ID 长 1–64，仅字母／数字／下划线／连字符；Body 拒绝多余字段。任务名 trim 后 1–120 字，Episode 1–10000，Seed 0–2147483647；新版另按目录收紧 Episode。page 从 1，pageSize 默认 20／最多 100，时间倒序＋ID 稳定排序。
+- **身份与写入**：校验 Session、预设账号 email／isDemo 和数据库角色；写入要求同源 Origin、Zod 与业务权限。POST／DELETE 都校验 Origin；后续 PATCH 复用同一边界。
+- **输入与分页**：ID 长 1–64，仅字母／数字／下划线／连字符；Body 拒绝多余字段。任务名 trim 后 1–120 字，Episode 1–10000，Seed 0–2147483647；目录另收紧 Episode。page 从 1，pageSize 默认 20／最多 100，时间倒序＋ID 稳定排序。
 - **响应**：成功 `{data,meta:{requestId}}`；错误 `{error:{code,message,fieldErrors,requestId}}`。fieldErrors 为字段消息数组映射或 null；不泄漏 SQL、密码或堆栈。
 - **幂等**：创建／重试／计划的报告生成带 1–128 字符 Idempotency-Key。同用户／操作／键及内容重复返回原对象；同键换内容 409。创建首次 201，重复 200。
 - **四个标识**：requestId 跟踪一次请求；runId 定位任务；幂等键识别重复动作；expectedVersion 防止编辑覆盖。
 
 ## 3. 当前状态与模拟逻辑
 
-PASSED 可创建，WARNING 明确接受，FAILED 阻断。当前要求成功基线且同项目／数据／Benchmark／Episode／Seed、不同模型版本；新目标是无基线也可创建，仅比较才校验基线。
+PASSED 可创建，WARNING 明确接受，FAILED 阻断。基线可不选；选了才要求成功、同项目／数据／Benchmark／Episode／Seed、不同模型版本且未隐藏。可选 targetSuccessRate 为 0.8／0.85；这是达标目标，不参与指标计算。
 
-创建保存 QUEUED；POST sync 满 2 秒可进入 RUNNING、满 12 秒可完成，每次推进一段，无后台执行。GET 始终只读，运行中 progress 为 null。当前 Mock 用基线固定增量生成四项指标和两条 OPEN 异常，结果／终态／审计同事务提交，不代表执行真实 Episode。
+创建保存 QUEUED；POST sync 满 2 秒可进入 RUNNING、满 12 秒可完成，每次推进一段，无后台执行。GET 始终只读，运行中 progress 为 null。Mock 按创建时配置快照、模型参数、数据／基准难度、Seed 与 Episode 生成四项指标和两条预置 OPEN 证据片段，结果／终态／审计同事务提交，不代表执行真实 Episode。
 
 QUEUED／RUNNING 可取消，完成竞争返回最新状态或 409；FAILED 重试新 ID 并保留 retryOfRunId。重试重新检查配置／质量，沿用审计中的真实警告接受；未接受的新 WARNING 返回 422。mockFailure 是故障展示，重试默认清除。
+
+每个工程师最多同时有 3 个 QUEUED／RUNNING 任务；先锁账号行，再查幂等与容量。终态释放名额。软删除只允许本人终态、保护预置示例；列表和详情隐藏，被已有任务引用的指标仍保留，重复删除只写一次审计。
 
 ## 4. 可执行请求示例
 
@@ -38,6 +33,10 @@ QUEUED／RUNNING 可取消，完成竞争返回最新状态或 409；FAILED 重�
 ```http
 @baseUrl = http://localhost:3000
 @sessionCookie = REPLACE_WITH_LOCAL_COOKIE_HEADER
+
+### 可选目录：200，固定仓储项目
+GET {{baseUrl}}/api/evaluation-catalog
+Cookie: {{sessionCookie}}
 
 ### 质量报告：200，四项检查
 GET {{baseUrl}}/api/datasets/demo-dataset-scenes-v3/quality
@@ -55,7 +54,8 @@ Idempotency-Key: interview-evaluation-001
   "modelVersionId": "demo-model-candidate",
   "datasetVersionId": "demo-dataset-scenes-v3",
   "benchmarkId": "demo-benchmark-v1",
-  "baselineRunId": "demo-run-baseline",
+  "baselineRunId": null,
+  "targetSuccessRate": 0.8,
   "episodeCount": 200,
   "simulationSeed": 20260901,
   "acceptQualityWarning": true,
@@ -92,13 +92,18 @@ POST {{baseUrl}}/api/evaluation-runs/{{runId}}/retry
 Cookie: {{sessionCookie}}
 Origin: http://localhost:3000
 Idempotency-Key: interview-retry-001
+
+### 本人终态任务软删除：重复删除仍 200
+DELETE {{baseUrl}}/api/evaluation-runs/{{runId}}
+Cookie: {{sessionCookie}}
+Origin: http://localhost:3000
 ```
 
 ### 代表性成功响应
 
 质量报告的 dataset 为 `warehouse-scenes v3`、sampleCount 2400、qualityStatus WARNING；检查含 name 和 message，遮挡场景分布 affectedCount 18。18 是质量统计，2 是每个完成任务实际保存的异常数。
 
-创建／详情／取消／重试返回完整 Run：ID、名称、配置 ID、状态、时间、Provider、基线／重试来源、错误、异常数，以及模型／数据集／Benchmark 展示名称、创建者和固定任务标记。完整字段见 OpenAPI 的 Run；创建时 startedAt／finishedAt／errorCode／errorMessage 均为 null、anomalyCount 为 0。
+创建／详情／取消／重试返回完整 Run：ID、名称、配置 ID、状态、时间、Provider、基线／重试来源、错误、异常数，以及模型／数据集／Benchmark 展示名称、创建者和固定任务标记。新增 targetSuccessRate、pendingReviewCount、successRule 和 metrics；完整字段见 OpenAPI 的 Run；创建时 startedAt／finishedAt／errorCode／errorMessage 均为 null、anomalyCount 为 0。
 
 ```json
 {
@@ -132,16 +137,16 @@ Idempotency-Key: interview-retry-001
 | 401 | UNAUTHENTICATED | 会话无效 |
 | 403 | FORBIDDEN | 角色、任务归属或 Origin 不满足 |
 | 404 | NOT_FOUND | 对象不存在 |
-| 409 | IDEMPOTENCY_CONFLICT／STATE_CONFLICT | 重复键内容不同或状态不允许 |
+| 409 | IDEMPOTENCY_CONFLICT／STATE_CONFLICT／TASK_LIMIT_REACHED | 重复键内容不同、状态不允许或已达三任务容量 |
 | 422 | VALIDATION_ERROR | 结构、路径、分页、字段或请求头不合法 |
 | 422 | QUALITY_WARNING_NOT_ACCEPTED／DATASET_QUALITY_BLOCKED | 未确认警告或质量阻断 |
 | 422 | INCOMPATIBLE_CONFIGURATION | 非同项目、非同口径或基线缺结果 |
-| 503 | EXTERNAL_SERVICE_ERROR | 完成时基线结果不可用，本次事务回滚 |
+| 503 | EXTERNAL_SERVICE_ERROR | 模拟配置不可用，本次事务回滚 |
 | 500 | INTERNAL_ERROR | 未预期错误 |
 
 ## 5. 新原型的计划示例
 
-以下不是当前可调用请求。目标创建使用 TargetCreateRunRequest，可省略 baselineRunId，增加可选 successRateThreshold（0.8／0.85）；目录返回可选版本、兼容关系和范围。选择必须影响执行，不能只改显示名称。
+下面的复核请求尚未实施。删除请求已在上一节列出。
 
 ~~~http
 ### 编辑或确认结论；mode=confirm 仅评测人员
@@ -151,9 +156,6 @@ Content-Type: application/json
 
 {"conclusion":"证据显示抓取路径在遮挡区域碰撞，建议调整后复测。","mode":"confirm","expectedVersion":2}
 
-### 删除本人已结束任务：软删除，保留证据引用
-DELETE {{baseUrl}}/api/evaluation-runs/{{runId}}
-Origin: http://localhost:3000
 ~~~
 
 结论不要求分类。保存草稿不覆盖已确认内容；确认／修改追加历史与审计，版本冲突返回 409 并保留输入。最终结论内容变化令旧报告过时；草稿变动不会让已确认报告失效。
@@ -169,3 +171,5 @@ Origin: http://localhost:3000
 | 2026-09-27 | 0.4.0 文档 | 保留实际八项；新目标与 planned 分开，移除回补，新增目录／软删除，结论编辑与报告版本修订；未改运行接口 |
 
 | 2026-09-27 | 0.4.1 | 双身份会话门禁已实现，旧 ADMIN 会话失效；八项请求字段／响应结构不变 |
+
+| 2026-09-27 | 0.5.0 | 自主目录、可空基线、目标与结果摘要、三任务容量及软删除已实现；targetSuccessRate 为实际目标字段 |

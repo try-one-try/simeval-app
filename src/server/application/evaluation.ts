@@ -3,6 +3,7 @@ import "server-only";
 import { evaluationRepository, type StoredRun } from "@/server/repositories/evaluation-repository";
 import { AppError, assertRole, isActive, type Actor, type CreateRunInput } from "@/domain/evaluation";
 import type { RunData, QualityData, EvaluationOptions } from "@/lib/evaluation-dto";
+import { ACTIVE_TASK_LIMIT, benchmarks, models, metricCatalog, snapshotSchema } from "@/domain/evaluation-catalog";
 const readers = ["ENGINEER", "REVIEWER", "ADMIN"] as const;
 function runDto(run: StoredRun): RunData {
   return { id: run.id, name: run.name ?? `${run.modelVersion.name} ${run.modelVersion.version} 固定评测`,
@@ -13,7 +14,11 @@ function runDto(run: StoredRun): RunData {
     errorCode: run.errorCode, errorMessage: run.errorMessage, anomalyCount: run._count.anomalies,
     modelName: run.modelVersion.name, modelVersion: run.modelVersion.version, datasetName: run.datasetVersion.name,
     datasetVersion: run.datasetVersion.version, benchmarkName: run.benchmark.name, benchmarkVersion: run.benchmark.version,
-    createdById: run.createdById, isDemoFixture: run.isDemoFixture };
+    createdById: run.createdById, isDemoFixture: run.isDemoFixture,
+    targetSuccessRate: run.targetSuccessRate === null ? null : Number(run.targetSuccessRate),
+    pendingReviewCount: run.anomalies.filter(sample => sample.status !== "RESOLVED").length,
+    successRule: snapshotSchema.safeParse(run.configurationSnapshot).data?.successRule ?? benchmarks.find(b => b.id === run.benchmarkId)?.successRule ?? "历史评测口径",
+    metrics: [...run.metricResults].sort((a,b) => metricCatalog.findIndex(m => m.key === a.metricDefinition.key) - metricCatalog.findIndex(m => m.key === b.metricDefinition.key)).map(metric => ({ key: metric.metricDefinition.key, name: metric.metricDefinition.name, unit: metric.metricDefinition.unit, scenarioKey: metric.scenarioKey, value: Number(metric.value), sampleCount: metric.sampleCount })) };
 }
 type DatasetRecord = NonNullable<Awaited<ReturnType<typeof evaluationRepository.quality>>>;
 function qualityDto(dataset: DatasetRecord): QualityData {
@@ -29,9 +34,9 @@ export const evaluationService = {
   async options(actor: Actor): Promise<EvaluationOptions> {
     assertRole(actor, readers);
     const { project, recent } = await evaluationRepository.options(actor);
-    return { project: project && { id: project.id, name: project.name }, models: project?.models.map(({ id, name, version }) => ({ id, name, version })) ?? [],
-      datasets: project?.datasets.map(qualityDto) ?? [], benchmarks: project?.benchmarks.map(({ id, name, version }) => ({ id, name, version })) ?? [],
-      baselines: project?.runs.map(runDto) ?? [], recent: recent.map(runDto) };
+    return { project: project && { id: project.id, name: project.name }, models: project?.models.filter(m => models.some(profile => profile.id === m.id && profile.selectable)).map(({ id, name, version }) => ({ id, name, version })) ?? [],
+      datasets: project?.datasets.map(qualityDto) ?? [], benchmarks: benchmarks.filter(b => project?.benchmarks.some(record => record.id === b.id)).map(b => ({ id: b.id, name: b.name, version: b.version, successRule: b.successRule, datasetIds: b.datasetIds, modelIds: b.modelIds, minEpisodes: b.minEpisodes, maxEpisodes: b.maxEpisodes })),
+      baselines: project?.runs.map(runDto) ?? [], recent: recent.map(runDto), activeTaskLimit: ACTIVE_TASK_LIMIT };
   },
   async quality(actor: Actor, id: string) {
     assertRole(actor, readers);
@@ -59,6 +64,7 @@ export const evaluationService = {
     return { data: runDto(result.run), replay: result.replay };
   },
   async cancel(actor: Actor, id: string) { return runDto(await evaluationRepository.cancel(actor, id)); },
+  async remove(actor: Actor, id: string) { return evaluationRepository.remove(actor, id); },
   async sync(actor: Actor, id: string) {
     assertRole(actor, readers);
     return statusDto(runDto(await evaluationRepository.sync(actor, id)));

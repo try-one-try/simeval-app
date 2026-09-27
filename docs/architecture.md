@@ -1,6 +1,6 @@
 # SimEval 架构设计
 
-**2026-09-27：双身份入口、真实切换和角色导航已接通，待负责人验收。** 第一版质量／评测继续可运行；自主配置、完整任务上下文和删除留阶段 4。本轮复用现有用户，未改 Schema、迁移或开发库 Seed。行为看[规格](../specs/002-quality-evaluation/spec.md)，HTTP 字段和实现状态看 [OpenAPI](openapi.yaml)。
+**2026-09-27：双身份、自主配置、两步质量确认、独立模拟、多任务与软删除已接通。** 比较／复核／报告仍待后续切片。行为看[规格](../specs/002-quality-evaluation/spec.md)，规则矩阵与算法看[计划](../specs/002-quality-evaluation/plan.md)，HTTP 看 [OpenAPI](openapi.yaml)。
 
 ## 1. 运行边界
 
@@ -51,16 +51,16 @@ flowchart LR
 | 草稿／最终结论 | 两者分开保存；版本保护、历史、审计与报告失效一起写入 |
 | 报告 | 输入由服务端组装；校验指标／样本引用；评测人员确认，过时报告保留历史 |
 
-总览目标是所选任务概况；当前代码仍只查询固定故事。未完成任务只展示状态，没有基线不伪造比较，没有结果不伪造异常。指标按 Benchmark 定义，目录变化必须影响结果口径。
+总览按显式 runId 查询所选任务的状态、配置、指标和待复核数。未完成任务只展示状态，没有基线不伪造比较，没有结果不伪造异常。指标按 Benchmark 定义，目录变化必须影响结果口径。
 
-## 4. 数据变化（待迁移）
+## 4. 已迁移与后续数据变化
 
-以下是**新增字段方案，不是当前 Schema 的完成清单**。实施前在计划中定稿，再追加迁移；不 reset，不覆盖已有非预置数据。
+阶段 4 已追加 `202609270001_autonomous_evaluation`；复核／报告仍待各自切片迁移。不 reset，不覆盖已有用户任务。
 
 | 对象 | 目标变化 |
 |---|---|
-| EvaluationRun | 现有 name 应在新建时必填；baselineRunId 已可空，但当前 API 仍必填。拟加 successRateThreshold（可空 0.8／0.85）、configurationSnapshotJson、deletedAt／deletedById |
-| 模型／数据／Benchmark 目录 | 增加兼容信息与 Episode 范围，Seed 提供可选择的版本及三种质量状态；兼容矩阵在编码前固定 |
+| EvaluationRun | 新建 name 必填、baselineRunId 可空；已加 targetSuccessRate（可空 0.8／0.85）、configurationSnapshot、deletedAt／deletedById |
+| 模型／数据／Benchmark 目录 | 兼容矩阵与模拟参数统一在 domain/evaluation-catalog.ts；prisma/catalog.ts 增量补目录，完整 Seed 调用它，db:catalog 不重置故事 |
 | AnomalySample | 拟分开 draftConclusion 与已确认 conclusion，保存修改人／时间、confirmedById／confirmedAt 和 confirmedRevision；现有 version 用于所有编辑防覆盖 |
 | ReviewRecord | 只追加每次草稿／确认／修改的内容、操作者、时间与来源版本，不要求人工分类 |
 | AIReport | 输入快照保存指标、证据和 sourceReviewVersions（样本 ID → 确认版本）；拟加 isStale／staleAt。过时报告保留原确认历史，当前入口提示重生成 |
@@ -71,12 +71,14 @@ flowchart LR
 
 ## 5. 当前可运行行为与写入保护
 
-现有八个操作读取质量、创建／列出／读取任务、读取状态、同步、取消和重试。当前创建仍依赖成功基线；Mock 用基线加固定增量生成四项指标和两条异常。
+现有十个操作包含目录、质量、创建／列表／详情、状态、同步、取消、重试和软删除。创建保存 mock-v2 参数快照；结果独立于基线，保留四项指标和两条预置证据片段。模型与难度改变指标，Seed／Episode 产生确定性偏移；目标仅判断达标，不改变结果。
 
 - GET 只读；POST sync 按服务器时间每次推进一段，约 2 秒运行、12 秒完成，没有后台执行。运行中 progress 为 null。
 - 成功的指标、异常、终态和审计同事务提交，重复同步不重复写。
 - 取消仅允许 QUEUED／RUNNING；条件更新和事务处理完成竞争。失败重试新建任务并保留 retryOfRunId。
 - 创建／重试按用户＋操作＋幂等键和请求摘要识别；同键不同内容拒绝。并发冲突有限重试。
-- 新复核用 expectedVersion 防覆盖；软删除过滤普通列表，已有基线／证据引用仍可内部解析。审计只追加。
+- 创建先锁 User 行，查幂等再查三个活跃任务容量；取消／终态释放名额。
+- 软删除过滤普通列表和详情；指标及已有外键引用保留，重复删除不重复审计。
+- 后续复核使用 expectedVersion 防覆盖；本阶段不把结论编辑说成已实现。
 
 Schema 改动后生成 Client、应用迁移、重启旧服务，再验网页。新版本相关测试与手工验收看 [Quickstart](../specs/002-quality-evaluation/quickstart.md)；旧测试通过不代表新设计已实现。

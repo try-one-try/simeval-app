@@ -2,9 +2,7 @@
 import Link from "next/link";
 import { WorkspaceNavigation, MobileNavigation } from "@/components/workspace-navigation";
 import { requireViewer } from "@/server/auth/require-viewer";
-import { leaveDemo } from "@/server/auth/actions";
 import { IdentitySwitcher } from "@/features/identity/identity-switcher";
-import { demoIdentities } from "@/lib/demo-identity";
 export default async function WorkspaceLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const viewer = await requireViewer();
   return <div className="workspace">
@@ -16,7 +14,6 @@ export default async function WorkspaceLayout({ children }: Readonly<{ children:
         <IdentitySwitcher key={viewer.id} role={viewer.role} /><MobileNavigation role={viewer.role} />
       </header>
       {children}
-      <footer className="workspace-footer"><span>{viewer.name} · {demoIdentities[viewer.role].label}</span><form action={leaveDemo}><button type="submit" className="text-action">退出演示 ↗</button></form></footer>
     </div>
   </div>;
 }

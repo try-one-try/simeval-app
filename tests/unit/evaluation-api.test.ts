@@ -1,10 +1,12 @@
 // 实际 HTTP 边界测试：身份、同源、JSON、参数与错误契约。
 import { beforeEach, expect, it, vi } from "vitest";
 vi.mock("server-only",()=>({}));
-const mocks=vi.hoisted(()=>({auth:vi.fn(),user:vi.fn(),create:vi.fn(),list:vi.fn(),get:vi.fn()}));
+const mocks=vi.hoisted(()=>({auth:vi.fn(),user:vi.fn(),create:vi.fn(),list:vi.fn(),get:vi.fn(),remove:vi.fn(),options:vi.fn()}));
 vi.mock("@/auth",()=>({auth:mocks.auth}));
 vi.mock("@/server/repositories/user-repository",()=>({userRepository:{findById:mocks.user}}));
-vi.mock("@/server/application/evaluation",()=>({evaluationService:{create:mocks.create,list:mocks.list,get:mocks.get},statusDto:(run:unknown)=>run}));
+vi.mock("@/server/application/evaluation",()=>({evaluationService:{create:mocks.create,list:mocks.list,get:mocks.get,remove:mocks.remove,options:mocks.options},statusDto:(run:unknown)=>run}));
+import { DELETE as removeRun } from "@/app/api/evaluation-runs/[runId]/route";
+import { GET as catalogGET } from "@/app/api/evaluation-catalog/route";
 import { GET,POST } from "@/app/api/evaluation-runs/route";
 import { GET as statusGET } from "@/app/api/evaluation-runs/[runId]/status/route";
 const body={name:"任务",modelVersionId:"candidate",datasetVersionId:"dataset",benchmarkId:"benchmark",baselineRunId:"baseline",episodeCount:200,simulationSeed:20260901,acceptQualityWarning:true};
@@ -61,4 +63,14 @@ it("未知错误返回通用 500 与请求号，不泄漏数据库错误",async(
     const response=await POST(request());expect(response.status).toBe(500);
     const payload=await response.json();expect(payload.error.requestId).toBeTruthy();expect(JSON.stringify(payload)).not.toContain("database-password-secret");
   }finally{spy.mockRestore();}
+});
+
+it("目录返回安全数据；删除仍需会话、工程师和同源，错误契约一致",async()=>{
+  mocks.options.mockResolvedValue({models:[],datasets:[],benchmarks:[],activeTaskLimit:3});
+  const catalog=await catalogGET(new Request("http://localhost:3000/api/evaluation-catalog"));expect(catalog.status).toBe(200);expect((await catalog.json()).data.activeTaskLimit).toBe(3);
+  const ctx={params:Promise.resolve({runId:"run"})};
+  const req=(origin="http://localhost:3000")=>new Request("http://localhost:3000/api/evaluation-runs/run",{method:"DELETE",headers:{origin}});
+  expect((await removeRun(req("http://evil.invalid"),ctx)).status).toBe(403);expect(mocks.remove).not.toHaveBeenCalled();
+  mocks.remove.mockResolvedValue({id:"run",deletedAt:"2026-09-27T00:00:00Z"});expect((await removeRun(req(),ctx)).status).toBe(200);
+  mocks.user.mockResolvedValue({id:"user",role:"REVIEWER",email:"reviewer@demo.simeval.local",isDemo:true});expect((await removeRun(req(),ctx)).status).toBe(403);
 });

@@ -161,6 +161,11 @@ model EvaluationRun {
   name               String?         @db.VarChar(120)
   requestFingerprint String?         @db.VarChar(64)
   mockFailure        Boolean         @default(false)
+  // 快照固定模拟口径；软删除只隐藏列表，不破坏历史引用。
+  targetSuccessRate  Decimal?        @db.Decimal(5, 4)
+  configurationSnapshot Json?
+  deletedAt          DateTime?
+  deletedById        String?         @db.VarChar(64)
   projectId          String          @db.VarChar(64)
   modelVersionId     String          @db.VarChar(64)
   datasetVersionId   String          @db.VarChar(64)
@@ -196,6 +201,7 @@ model EvaluationRun {
   baselineReports    AIReport[]      @relation("ReportBaseline")
   @@unique([createdById, idempotencyKey])
   @@index([projectId, status, createdAt])
+  @@index([createdById, deletedAt, status])
 }
 
 model MetricResult {

@@ -1,6 +1,5 @@
-// 路由只组合应用查询与展示组件，不访问 Prisma 或保存判断规则。
-import { getOverview } from "@/server/application/get-overview";
-import { OverviewView } from "@/features/overview/overview-view";
-export default async function OverviewPage() {
-  return <OverviewView overview={await getOverview()} />;
+// 模块入口复用单选任务流程；带 runId 时直接打开同一任务。
+import { ModuleEntry, type ModuleParams } from "@/features/evaluation/module-entry";
+export default function Page({ searchParams }: { searchParams: ModuleParams }) {
+  return <ModuleEntry module="overview" searchParams={searchParams} />;
 }

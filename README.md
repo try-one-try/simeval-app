@@ -10,7 +10,7 @@
 
 产品只有算法工程师和评测人员，预设登录二选一、无注册；工程师管理本人任务和草稿，评测人员确认结论／报告。除创建外先选择任务，后续按钮延续当前任务；支持多任务、取消／重试／软删除。首次没有基线也应能评测；不做独立回补管理或人工分类步骤。
 
-**当前已实现双身份登录／切换、角色默认入口与导航、共享任务列表，以及第一版质量／模拟评测和固定故事总览。** 八个业务 HTTP 操作已有实现，旧管理员会话已停用。自主目录、可选基线、完整任务上下文及删除留阶段 4；比较、复核、AI 报告当前显示未开放。采用合成数据、预置质量报告与模拟执行，不运行真实仿真或模型训练。
+**当前已实现双身份登录／切换、角色导航、自主配置与质量两步、无基线模拟、多任务单选／上下文延续、所选任务总览、取消／重试／软删除。** 十个业务 HTTP 操作已可调用；比较、复核、AI 报告只接任务入口，业务将在后续切片实现。合成数据、预置报告与模拟执行明确标注，不运行真实仿真或训练。
 
 本轮身份适配通过 lint、类型、60 项单元测试、7 项独立 MySQL 集成测试和生产构建；代理实际检查登录／双向切换、权限、刷新／退出、375px 与 Escape／焦点。负责人验收及后续切片仍待完成。目标是在几分钟内看懂“总体提升但遮挡回退 → 两条证据原因不同 → 人工确认”，部署与首次访问计时仍待完成。
 
@@ -56,10 +56,10 @@ npm run dev
 
 **平时再次打开**：在 `simeval-app/` 中运行 `npm run dev`，看到 `Ready` 后访问 `http://localhost:3000`；结束时在该终端按 `Ctrl+C`。若端口 3000 已有本项目服务，直接打开网页即可，不要再启动第二个服务。改动依赖锁文件后才需要重新运行 `npm ci`；拉取仓库新增迁移时运行 `db:deploy`，自己修改 Schema 时运行 `db:migrate`，需要重建演示故事时运行 `db:seed`。Schema 变化后另运行 `db:generate` 并重启旧开发服务。
 
-打开 `/login` 选择身份：工程师默认进入创建，评测人员进入异常复核的未开放页。右上角可切换；角色导航和实际会话同步变化。当前创建仍预填旧配置，总览仍是固定故事；具体检查看 [当前验收步骤](specs/002-quality-evaluation/quickstart.md)。
+打开 `/login` 选择身份：工程师默认进入创建，评测人员进入异常复核的任务选择页。右上角可切换；角色导航和实际会话同步变化。创建默认空选，演示配置只填表；总览显示所选任务；阶段 4 更新已有环境：停止旧 dev，依次运行 `npm run db:generate`、`npm run db:deploy`、`npm run db:catalog`、`npm run dev`；新环境完整 Seed 已包含目录。具体检查看 [当前验收步骤](specs/002-quality-evaluation/quickstart.md)。
 
 生产预览先停止开发服务，再运行 `npm run build`、`npm run start`；仅对可信 localhost 在本地配置 `AUTH_TRUST_HOST="true"`，普通开发无需此项。MockEvaluationProvider 已接入，AI Provider 后续实现。
 
-测试命令按目的区分：`npm run test:unit` 只测试代码逻辑，不需要 MySQL 测试库；`npm run test:integration` 才连接独立的 `simeval_test`，应用已有迁移、连续运行两次 Seed 并核对结果。首次使用集成测试前运行 `.\scripts\setup-local-db.ps1 -Database test`，它只建立测试库与账号，并写入被忽略的 `.env.test.local`；随后再运行 `npm run test:integration`。`npm test` 会运行所有 Vitest 用例，但没有测试库配置时会显示集成测试已跳过，不能当作集成测试通过。网页行为和视觉效果由项目负责人按照 [当前手工验收步骤](specs/002-quality-evaluation/quickstart.md#1-阶段-3照着检查身份入口) 在真实浏览器中检查，不运行自动浏览器测试。
+测试命令按目的区分：`npm run test:unit` 只测试代码逻辑，不需要 MySQL 测试库；`npm run test:integration` 才连接独立的 `simeval_test`，应用已有迁移、连续运行两次 Seed 并核对结果。首次使用集成测试前运行 `.\scripts\setup-local-db.ps1 -Database test`，它只建立测试库与账号，并写入被忽略的 `.env.test.local`；随后再运行 `npm run test:integration`。`npm test` 会运行所有 Vitest 用例，但没有测试库配置时会显示集成测试已跳过，不能当作集成测试通过。网页行为和视觉效果由项目负责人按照 [当前手工验收步骤](specs/002-quality-evaluation/quickstart.md#3-阶段-4-实现后再验) 在真实浏览器中检查，不运行自动浏览器测试。
 
 本地 `127.0.0.1` 的 MySQL 地址只供本机使用。未来部署时应在托管环境配置其可访问的独立 MySQL `DATABASE_URL`、`AUTH_SECRET` 和演示入口变量，并对目标库单独执行生产迁移与 Seed；不要上传 `.env.local` 或使用本机数据库地址。

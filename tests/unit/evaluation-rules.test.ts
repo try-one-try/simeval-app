@@ -2,6 +2,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { assertQuality, assertConfiguration, assertMutable, createRunSchema, type CreateRunInput } from "@/domain/evaluation";
 vi.mock("server-only", () => ({}));
+import { configurationProfile, type SimulationSnapshot } from "@/domain/evaluation-catalog";
 import { MockEvaluationProvider } from "@/server/providers/evaluation-provider";
 const input: CreateRunInput = { name:"评测", modelVersionId:"candidate", datasetVersionId:"dataset", benchmarkId:"benchmark", baselineRunId:"baseline", episodeCount:200, simulationSeed:20260901, acceptQualityWarning:true, mockFailure:false };
 const baseline = { projectId:"project", modelVersionId:"old", datasetVersionId:"dataset", benchmarkId:"benchmark", status:"SUCCEEDED", episodeCount:200, simulationSeed:20260901 };
@@ -20,9 +21,9 @@ describe("质量与配置门禁", () => {
 });
 describe("任务操作", () => {
   const run = {createdById:"owner",isDemoFixture:false,status:"RUNNING" as const};
-  it("取消只允许拥有者或管理员，固定故事和终态不修改", () => {
+  it("取消只允许工程师拥有者，固定故事和终态不修改", () => {
     expect(() => assertMutable({id:"owner",role:"ENGINEER"},run,"cancel")).not.toThrow();
-    expect(() => assertMutable({id:"admin",role:"ADMIN"},run,"cancel")).not.toThrow();
+    expect(() => assertMutable({id:"admin",role:"ADMIN"},run,"cancel")).toThrow();
     for (const actor of [{id:"other",role:"ENGINEER" as const},{id:"owner",role:"REVIEWER" as const}]) expect(() => assertMutable(actor,run,"cancel")).toThrow();
     expect(() => assertMutable({id:"owner",role:"ENGINEER"},{...run,status:"SUCCEEDED"},"cancel")).toThrow();
     expect(() => assertMutable({id:"owner",role:"ENGINEER"},{...run,isDemoFixture:true},"cancel")).toThrow();
@@ -45,9 +46,25 @@ describe("模拟 Provider", () => {
     expect(provider.nextStatus({...task,status:"RUNNING",mockFailure:true},now(12000))).toBe("FAILED");
     for(const status of ["SUCCEEDED","FAILED","CANCELLED"] as const) expect(provider.nextStatus({...task,status},now(99999))).toBe(status);
   });
-  it("确定性合成结果保留基线的指标、场景和样本口径", () => {
-    const metrics=[{metricDefinitionId:"m",key:"success_rate",scenarioKey:"overall",sampleCount:200,value:76},{metricDefinitionId:"c",key:"collision_rate",scenarioKey:"occlusion",sampleCount:50,value:8}];
-    expect(provider.results(metrics)).toEqual([{...metrics[0],value:81},{...metrics[1],value:13}]);
-    expect(metrics[0].value).toBe(76);
+  const snapshot: SimulationSnapshot = { algorithm:"mock-v2", modelId:"model", datasetId:"dataset", benchmarkId:"benchmark", success:81, collision:13, duration:11.8, intervention:5, difficulty:0, episodeCount:200, simulationSeed:20260901, scenarioKey:"occlusion", scenarioFraction:.25, successRule:"合成规则", metrics:[{id:"s",key:"success_rate"},{id:"c",key:"collision_rate"}] };
+  it("无基线也能复现固定故事，并保持总体与场景样本数", () => {
+    expect(provider.results(snapshot)).toEqual([{metricDefinitionId:"s",key:"success_rate",scenarioKey:"__overall__",sampleCount:200,value:81},{metricDefinitionId:"c",key:"collision_rate",scenarioKey:"occlusion",sampleCount:50,value:13}]);
+    expect(provider.results(snapshot)).toEqual(provider.results({...snapshot}));
   });
+  it("模型、难度、Seed、规模确实影响模拟；目标不影响结果",()=>{
+    const base=provider.results(snapshot);
+    for(const change of [{success:84},{difficulty:6},{simulationSeed:42},{episodeCount:500}]) expect(provider.results({...snapshot,...change})).not.toEqual(base);
+  });
+});
+it("首次无基线合法，跨项目仍拒绝；可空目标与严格字段校验",()=>{
+  expect(()=>assertConfiguration({...input,baselineRunId:null},["p","p","p"],null)).not.toThrow();
+  expect(()=>assertConfiguration({...input,baselineRunId:null},["p","other"],null)).toThrow();
+  expect(createRunSchema.safeParse({...input,baselineRunId:null,targetSuccessRate:.8}).success).toBe(true);
+  expect(createRunSchema.safeParse({...input,targetSuccessRate:.9}).success).toBe(false);
+});
+it("目录不兼容有明确边界；软删除只允许本人终态，预置示例受保护",()=>{
+  expect(configurationProfile("demo-model-v25","demo-dataset-clean-v1","demo-benchmark-occlusion-v1")).toBeNull();
+  const owner={id:"owner",role:"ENGINEER" as const},run={createdById:"owner",isDemoFixture:false,status:"SUCCEEDED" as const};
+  expect(()=>assertMutable(owner,run,"delete")).not.toThrow();
+  for(const change of [{status:"RUNNING" as const},{isDemoFixture:true},{createdById:"other"}]) expect(()=>assertMutable(owner,{...run,...change},"delete")).toThrow();
 });
