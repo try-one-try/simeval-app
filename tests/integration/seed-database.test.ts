@@ -33,7 +33,7 @@ describe.skipIf(!testUrl)("独立 MySQL 测试库", () => {
       const snapshot = async () => ({
         users: await db.user.findMany({ where: { isDemo: true }, select: { id: true, role: true }, orderBy: { id: "asc" } }),
         project: await db.project.findUnique({ where: { slug: "warehouse-manipulation" }, select: { id: true } }),
-        runs: await db.evaluationRun.findMany({ where: { isDemoFixture: true }, select: { id: true, modelVersionId: true, datasetVersionId: true }, orderBy: { id: "asc" } }),
+        runs: await db.evaluationRun.findMany({ where: { isDemoFixture: true }, select: { id: true, name: true, modelVersionId: true, datasetVersionId: true }, orderBy: { id: "asc" } }),
         samples: await db.anomalySample.findMany({ where: { runId: "demo-run-candidate" }, select: { id: true, runId: true }, orderBy: { id: "asc" } }),
         report: await db.aIReport.findUnique({ where: { id: "demo-report-confirmed" }, select: { id: true, runId: true, baselineRunId: true } }),
       });
@@ -51,6 +51,9 @@ describe.skipIf(!testUrl)("独立 MySQL 测试库", () => {
       expect(second.users).toHaveLength(3);
       expect(second.project?.id).toBe("demo-project-warehouse");
       expect(second.runs).toHaveLength(4);
+      expect(second.runs.every(run => !!run.name && !/[\u3400-\u9fff]/.test(run.name))).toBe(true);
+      const modelNames = await db.modelVersion.findMany({ where: { projectId: "demo-project-warehouse" }, select: { name: true } });
+      expect(modelNames.every(model => model.name === "PickPlace Policy")).toBe(true);
       const { seedCatalog } = await import("../../prisma/catalog");
       const historicalId = "demo-run-v21";
       const historical = await db.evaluationRun.findUniqueOrThrow({ where: { id: historicalId }, include: { metricResults: true } });

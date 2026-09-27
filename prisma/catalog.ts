@@ -1,15 +1,17 @@
-// 增量写入补目录与历史合成基线；稳定键只创建缺项，不改既有任务、指标或复核。
+// 增量补目录与历史基线；只迁移旧默认名称，保留自定义名称、指标和复核。
 import type { PrismaClient } from "../src/generated/prisma/client";
-import { PROJECT_ID, models, datasets, benchmarks, metricCatalog, metricId } from "../src/domain/evaluation-catalog";
+import { PROJECT_ID, models, datasets, benchmarks, metricCatalog, metricId, DEMO_RUN_NAMES } from "../src/domain/evaluation-catalog";
 export async function seedCatalog(db: PrismaClient) {
   await db.$transaction(async tx => {
     for (const model of models) {
       const { id, name, version } = model;
       await tx.modelVersion.upsert({ where: { id }, create: { id, name, version, projectId: PROJECT_ID, artifactRef: `synthetic://${id}` }, update: {} });
+      await tx.modelVersion.updateMany({ where: { id, name: "PickPlace" }, data: { name } });
     }
     for (const dataset of datasets) {
       const { id, name, version, qualityStatus, sampleCount } = dataset;
       await tx.datasetVersion.upsert({ where: { id }, create: { id, name, version, qualityStatus, sampleCount, projectId: PROJECT_ID, metadata: { synthetic: true } }, update: {} });
+      await tx.datasetVersion.updateMany({ where: { id, name: id.replace("demo-dataset-", "warehouse-").replace(/-v\d+$/, "") }, data: { name } });
       // 既有 WARNING 报告保留；新目录项提供真实存储的预置检查说明。
       if (id !== "demo-dataset-scenes-v3") await tx.dataQualityCheck.upsert({
         where: { datasetVersionId_checkKey: { datasetVersionId: id, checkKey: "required_fields" } },
@@ -32,13 +34,14 @@ export async function seedCatalog(db: PrismaClient) {
       const finishedAt = new Date(at.getTime() + 8 * 60_000);
       await tx.evaluationRun.upsert({
         where: { id: runId },
-        create: { id: runId, name: "PickPlace " + model.version + " 历史合成示例", projectId: PROJECT_ID, modelVersionId: model.id,
+        create: { id: runId, name: DEMO_RUN_NAMES[modelId === "demo-model-v21" ? "demo-run-v21" : "demo-run-v22"], projectId: PROJECT_ID, modelVersionId: model.id,
           datasetVersionId: "demo-dataset-scenes-v3", benchmarkId: "demo-benchmark-v1",
           status: "SUCCEEDED", createdById: "demo-user-engineer", provider: "MockEvaluationProvider",
           episodeCount: 200, simulationSeed: 20260901, isDemoFixture: true,
           createdAt: at, startedAt: at, finishedAt, resultsGeneratedAt: finishedAt },
         update: {},
       });
+      await tx.evaluationRun.updateMany({ where: { id: runId, name: "PickPlace " + model.version + " 历史合成示例" }, data: { name: DEMO_RUN_NAMES[modelId === "demo-model-v21" ? "demo-run-v21" : "demo-run-v22"] } });
       for (const metric of metricCatalog) {
         const data = { runId, metricDefinitionId: metricId("demo-benchmark-v1", metric.suffix),
           scenarioKey: metric.suffix === "collision" ? "occlusion" : "__overall__",
@@ -46,5 +49,8 @@ export async function seedCatalog(db: PrismaClient) {
         await tx.metricResult.upsert({ where: { id: runId + "-" + metric.suffix }, create: { id: runId + "-" + metric.suffix, ...data }, update: {} });
       }
     }
+    // 原固定候选／基线没有名称；只补空值，不覆盖人工改过的任务名。
+    for (const id of ["demo-run-baseline", "demo-run-candidate"] as const)
+      await tx.evaluationRun.updateMany({ where: { id, name: null }, data: { name: DEMO_RUN_NAMES[id] } });
   });
 }

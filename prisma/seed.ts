@@ -5,6 +5,7 @@ import { PrismaMariaDb } from "@prisma/adapter-mariadb";
 import { PrismaClient } from "../src/generated/prisma/client";
 import { parseDatabaseUrl } from "../src/lib/database-url";
 import { seedCatalog } from "./catalog";
+import { MODEL_FAMILY_NAME, DEMO_RUN_NAMES, datasets } from "../src/domain/evaluation-catalog";
 
 if (existsSync(".env.local")) process.loadEnvFile(".env.local");
 
@@ -49,13 +50,13 @@ async function seedStory() {
   await db.$transaction(async (tx) => {
     await tx.project.upsert({
       where: { slug: "warehouse-manipulation" },
-      create: { id: "demo-project-warehouse", slug: "warehouse-manipulation", name: "仓储操作评测", description: "比较仓储抓取策略在遮挡场景中的表现。" },
-      update: { name: "仓储操作评测", description: "比较仓储抓取策略在遮挡场景中的表现。" },
+      create: { id: "demo-project-warehouse", slug: "warehouse-manipulation", name: "Warehouse Manipulation", description: "比较仓储抓取策略在遮挡场景中的表现。" },
+      update: { name: "Warehouse Manipulation", description: "比较仓储抓取策略在遮挡场景中的表现。" },
     });
 
     for (const model of [
-      { id: "demo-model-baseline", name: "PickPlace", version: "v2.3" },
-      { id: "demo-model-candidate", name: "PickPlace", version: "v2.4" },
+      { id: "demo-model-baseline", name: MODEL_FAMILY_NAME, version: "v2.3" },
+      { id: "demo-model-candidate", name: MODEL_FAMILY_NAME, version: "v2.4" },
     ]) {
       await tx.modelVersion.upsert({
         where: { id: model.id },
@@ -66,8 +67,8 @@ async function seedStory() {
 
     await tx.datasetVersion.upsert({
       where: { id: "demo-dataset-scenes-v3" },
-      create: { id: "demo-dataset-scenes-v3", projectId: "demo-project-warehouse", name: "warehouse-scenes", version: "v3", sampleCount: 2400, qualityStatus: "WARNING", metadata: { synthetic: true } },
-      update: { sampleCount: 2400, qualityStatus: "WARNING", metadata: { synthetic: true } },
+      create: { id: "demo-dataset-scenes-v3", projectId: "demo-project-warehouse", name: datasets.find(dataset => dataset.id === "demo-dataset-scenes-v3")!.name, version: "v3", sampleCount: 2400, qualityStatus: "WARNING", metadata: { synthetic: true } },
+      update: { name: datasets.find(dataset => dataset.id === "demo-dataset-scenes-v3")!.name, sampleCount: 2400, qualityStatus: "WARNING", metadata: { synthetic: true } },
     });
 
     for (const check of [
@@ -106,6 +107,7 @@ async function seedStory() {
       { id: "demo-run-candidate", modelVersionId: "demo-model-candidate", baselineRunId: "demo-run-baseline", createdAt: at(10), finishedAt: at(10, 8) },
     ]) {
       const data = {
+        name: DEMO_RUN_NAMES[run.id as "demo-run-baseline" | "demo-run-candidate"],
         projectId: "demo-project-warehouse", modelVersionId: run.modelVersionId,
         datasetVersionId: "demo-dataset-scenes-v3", benchmarkId: "demo-benchmark-v1",
         baselineRunId: run.baselineRunId, status: "SUCCEEDED" as const,

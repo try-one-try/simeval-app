@@ -50,7 +50,7 @@ Content-Type: application/json
 Idempotency-Key: interview-evaluation-001
 
 {
-  "name": "v2.4 仓储操作评测",
+  "name": "Warehouse Manipulation Evaluation v2.4",
   "modelVersionId": "demo-model-candidate",
   "datasetVersionId": "demo-dataset-scenes-v3",
   "benchmarkId": "demo-benchmark-v1",
@@ -101,7 +101,7 @@ Origin: http://localhost:3000
 
 ### 代表性成功响应
 
-质量报告的 dataset 为 `warehouse-scenes v3`、sampleCount 2400、qualityStatus WARNING；检查含 name 和 message，遮挡场景分布 affectedCount 18。18 是质量统计，2 是每个完成任务实际保存的异常数。
+质量报告的 dataset 为 `Warehouse Scenes v3`、sampleCount 2400、qualityStatus WARNING；检查含 name 和 message，遮挡场景分布 affectedCount 18。18 是质量统计，2 是每个完成任务实际保存的异常数。
 
 创建／详情／取消／重试返回完整 Run：ID、名称、配置 ID、状态、时间、Provider、基线／重试来源、错误、异常数，以及模型／数据集／Benchmark 展示名称、创建者和固定任务标记。新增 targetSuccessRate、pendingReviewCount、successRule 和 metrics；完整字段见 OpenAPI 的 Run；创建时 startedAt／finishedAt／errorCode／errorMessage 均为 null、anomalyCount 为 0。
 

@@ -2,17 +2,26 @@
 import { z } from "zod";
 export const ACTIVE_TASK_LIMIT = 3;
 export const PROJECT_ID = "demo-project-warehouse";
+// 系统演示名称与 Seed／表单共用；ID 和版本保持稳定，不改变评测口径。
+export const MODEL_FAMILY_NAME = "PickPlace Policy";
+export const CUSTOM_DEMO_RUN_NAME = "Custom - Warehouse Manipulation v2.4";
+export const DEMO_RUN_NAMES = {
+  "demo-run-baseline": "Warehouse Baseline v2.3",
+  "demo-run-candidate": "Warehouse Candidate v2.4",
+  "demo-run-v21": "Warehouse Reference v2.1",
+  "demo-run-v22": "Warehouse Reference v2.2",
+} as const;
 export const models = [
-  { id: "demo-model-v21", name: "PickPlace", version: "v2.1", selectable: false, success: 70, collision: 11, duration: 13.8, intervention: 8 },
-  { id: "demo-model-v22", name: "PickPlace", version: "v2.2", selectable: false, success: 73, collision: 9, duration: 13, intervention: 7 },
-  { id: "demo-model-baseline", name: "PickPlace", version: "v2.3", selectable: false, success: 76, collision: 8, duration: 12.4, intervention: 6 },
-  { id: "demo-model-candidate", name: "PickPlace", version: "v2.4", selectable: true, success: 81, collision: 13, duration: 11.8, intervention: 5 },
-  { id: "demo-model-v25", name: "PickPlace", version: "v2.5", selectable: true, success: 84, collision: 9, duration: 11.4, intervention: 4 },
+  { id: "demo-model-v21", name: MODEL_FAMILY_NAME, version: "v2.1", selectable: false, success: 70, collision: 11, duration: 13.8, intervention: 8 },
+  { id: "demo-model-v22", name: MODEL_FAMILY_NAME, version: "v2.2", selectable: false, success: 73, collision: 9, duration: 13, intervention: 7 },
+  { id: "demo-model-baseline", name: MODEL_FAMILY_NAME, version: "v2.3", selectable: false, success: 76, collision: 8, duration: 12.4, intervention: 6 },
+  { id: "demo-model-candidate", name: MODEL_FAMILY_NAME, version: "v2.4", selectable: true, success: 81, collision: 13, duration: 11.8, intervention: 5 },
+  { id: "demo-model-v25", name: MODEL_FAMILY_NAME, version: "v2.5", selectable: true, success: 84, collision: 9, duration: 11.4, intervention: 4 },
 ];
 export const datasets = [
-  { id: "demo-dataset-scenes-v3", name: "warehouse-scenes", version: "v3", qualityStatus: "WARNING" as const, sampleCount: 2400, difficulty: 0, minEpisodes: 50, maxEpisodes: 1000 },
-  { id: "demo-dataset-clean-v1", name: "warehouse-clean", version: "v1", qualityStatus: "PASSED" as const, sampleCount: 1200, difficulty: -3, minEpisodes: 50, maxEpisodes: 1000 },
-  { id: "demo-dataset-invalid-v1", name: "warehouse-invalid", version: "v1", qualityStatus: "FAILED" as const, sampleCount: 300, difficulty: 4, minEpisodes: 50, maxEpisodes: 300 },
+  { id: "demo-dataset-scenes-v3", name: "Warehouse Scenes", version: "v3", qualityStatus: "WARNING" as const, sampleCount: 2400, difficulty: 0, minEpisodes: 50, maxEpisodes: 1000 },
+  { id: "demo-dataset-clean-v1", name: "Warehouse Clean", version: "v1", qualityStatus: "PASSED" as const, sampleCount: 1200, difficulty: -3, minEpisodes: 50, maxEpisodes: 1000 },
+  { id: "demo-dataset-invalid-v1", name: "Warehouse Incomplete", version: "v1", qualityStatus: "FAILED" as const, sampleCount: 300, difficulty: 4, minEpisodes: 50, maxEpisodes: 300 },
 ];
 export const benchmarks = [
   { id: "demo-benchmark-v1", name: "Warehouse Manipulation", version: "v1", successRule: "在规定时间内完成抓取和放置；总体成功率按 Episode 统计。", difficulty: 0, minEpisodes: 50, maxEpisodes: 1000, scenarioKey: "occlusion", scenarioFraction: .25, datasetIds: datasets.map(d => d.id), modelIds: models.filter(m => m.selectable).map(m => m.id) },

@@ -98,7 +98,7 @@ export const evaluationRepository = {
       const creationAudit = await tx.auditLog.findFirst({ where: { entityType: "EvaluationRun", entityId: id, action: { in: ["EVALUATION_CREATED", "EVALUATION_RETRIED"] } }, orderBy: { createdAt: "asc" } });
       const metadata = creationAudit?.metadata;
       const accepted = !!metadata && typeof metadata === "object" && !Array.isArray(metadata) && metadata.acceptQualityWarning === true;
-      const input: CreateRunInput = { name: original.name ?? "模拟评测", modelVersionId: original.modelVersionId,
+      const input: CreateRunInput = { name: original.name ?? "Simulation Evaluation", modelVersionId: original.modelVersionId,
         datasetVersionId: original.datasetVersionId, benchmarkId: original.benchmarkId, baselineRunId: original.baselineRunId,
         targetSuccessRate: original.targetSuccessRate ? Number(original.targetSuccessRate) as .8 | .85 : null,
         episodeCount: original.episodeCount, simulationSeed: original.simulationSeed, acceptQualityWarning: accepted, mockFailure: false };

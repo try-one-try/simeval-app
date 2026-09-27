@@ -6,7 +6,7 @@ import type { RunData, QualityData, EvaluationOptions } from "@/lib/evaluation-d
 import { ACTIVE_TASK_LIMIT, benchmarks, models, metricCatalog, snapshotSchema } from "@/domain/evaluation-catalog";
 const readers = ["ENGINEER", "REVIEWER", "ADMIN"] as const;
 export function runDto(run: StoredRun): RunData {
-  return { id: run.id, name: run.name ?? `${run.modelVersion.name} ${run.modelVersion.version} 固定评测`,
+  return { id: run.id, name: run.name ?? `${run.modelVersion.name} ${run.modelVersion.version} Evaluation`,
     projectId: run.projectId, status: run.status, modelVersionId: run.modelVersionId, datasetVersionId: run.datasetVersionId,
     benchmarkId: run.benchmarkId, baselineRunId: run.baselineRunId, retryOfRunId: run.retryOfRunId,
     episodeCount: run.episodeCount, simulationSeed: run.simulationSeed, provider: run.provider,

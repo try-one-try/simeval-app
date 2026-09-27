@@ -3,7 +3,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import type { Actor } from "@/domain/evaluation";
-import { configurationProfile } from "@/domain/evaluation-catalog";
+import { configurationProfile, CUSTOM_DEMO_RUN_NAME } from "@/domain/evaluation-catalog";
 import type { EvaluationOptions, QualityData, RunData } from "@/lib/evaluation-dto";
 import { apiRequest, ClientError, errorText } from "@/lib/api-client";
 export function CreateForm({ options, actor }: { options: EvaluationOptions; actor: Actor }) {
@@ -32,7 +32,7 @@ export function CreateForm({ options, actor }: { options: EvaluationOptions; act
   const canStart = valid && !!quality?.canStartEvaluation && (quality.dataset.qualityStatus !== "WARNING" || accepted);
   function configurationChanged() { setBaselineId(""); setAccepted(false); setQuality(null); setError(""); }
   function demo() {
-    setName("自定义评测 · 仓储综合 · v2.4"); setModelId("demo-model-candidate"); setDatasetId("demo-dataset-scenes-v3");
+    setName(CUSTOM_DEMO_RUN_NAME); setModelId("demo-model-candidate"); setDatasetId("demo-dataset-scenes-v3");
     setBenchmarkId("demo-benchmark-v1"); setEpisodes(200); setSeed(20260901);
     setTarget("0.8"); setBaselineId(""); setAccepted(false); setQuality(null); setError("");
   }
