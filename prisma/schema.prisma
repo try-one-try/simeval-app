@@ -67,7 +67,7 @@ model User {
   email             String          @unique @db.VarChar(191)
   name              String          @db.VarChar(120)
   role              Role
-  passwordHash      String          @db.VarChar(255)
+  passwordHash      String?         @db.VarChar(255)
   isDemo            Boolean         @default(false)
   createdAt         DateTime        @default(now())
   createdRuns       EvaluationRun[] @relation("RunCreator")
@@ -80,6 +80,14 @@ model User {
   requestedReports  AIReport[]      @relation("ReportRequester")
   confirmedReports  AIReport[]      @relation("ReportConfirmer")
   audits            AuditLog[]      @relation("AuditActor")
+}
+
+// 只保存请求来源的摘要和失败次数，不保存原始 IP 或访问密码。
+model AccessAttempt {
+  keyHash         String    @id @db.VarChar(64)
+  failures        Int       @default(0)
+  windowStartedAt DateTime
+  blockedUntil    DateTime?
 }
 
 model Project {

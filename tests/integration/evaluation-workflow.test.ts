@@ -25,8 +25,7 @@ describe.skipIf(!testUrl)("评测真实数据库事务",()=>{
     process.env.DATABASE_URL=testUrl;vi.resetModules();
   db=(await import("@/server/db")).getDb();
   const {seedDefaultData}=await import("../../prisma/seed-data");
-  if(!process.env.DEMO_PASSWORD)throw new Error("DEMO_PASSWORD is required");
-  await db.$transaction(tx=>seedDefaultData(tx,process.env.DEMO_PASSWORD!),{timeout:60_000});
+  await db.$transaction(tx=>seedDefaultData(tx),{timeout:60_000});
     repository=(await import("@/server/repositories/evaluation-repository")).evaluationRepository;
     service=(await import("@/server/application/evaluation")).evaluationService;
     db=(await import("@/server/db")).getDb();

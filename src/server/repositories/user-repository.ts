@@ -1,4 +1,4 @@
-// 用户仓储封装账号查询，供凭据验证和会话门禁复用。
+// 用户仓储封装演示身份与会话门禁查询；访问密码不存数据库。
 import "server-only";
 import { getDb } from "@/server/db";
 
@@ -8,7 +8,6 @@ const userSelect = {
   name: true,
   role: true,
   isDemo: true,
-  passwordHash: true,
 } as const;
 
 export const userRepository = {

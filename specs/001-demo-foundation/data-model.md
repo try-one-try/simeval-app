@@ -8,7 +8,8 @@
 
 | 实体 | 核心字段与约束 | 本切片用途 |
 |---|---|---|
-| User | `id`、唯一 `email`、`name`、`role`、`passwordHash`、`isDemo` | 会话身份与演示账号。默认快捷入口仅使用 ENGINEER；密码摘要不返回页面。 |
+| User | `id`、唯一 `email`、`name`、`role`、可空 `passwordHash`、`isDemo` | 会话身份与演示账号；现行 ENGINEER／REVIEWER 不使用个人密码。旧摘要字段仅供历史数据兼容，不返回页面。 |
+| AccessAttempt | 来源 HMAC 摘要、失败次数、窗口起点、封锁到期时间 | 跨实例限制猜测访问密码；不存原始 IP 或输入的密码。 |
 | Project | `id`、唯一 `slug`、`name`、`description` | Warehouse Manipulation 演示项目。 |
 | ModelVersion | `id`、`projectId`、`name`、`version`；`projectId+name+version` 唯一 | 固定的 v2.3 基线与 v2.4 候选。 |
 | DatasetVersion | `id`、`projectId`、`name`、`version`、`sampleCount`、`qualityStatus`；`projectId+name+version` 唯一 | 固定的 warehouse-scenes-v3，状态 WARNING。 |

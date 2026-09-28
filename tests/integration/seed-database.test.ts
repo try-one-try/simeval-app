@@ -2,7 +2,6 @@
 import { existsSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { PrismaPg } from "@prisma/adapter-pg";
-import { compare } from "bcryptjs";
 import { PrismaClient } from "../../src/generated/prisma/client";
 import { describe, expect, it, vi } from "vitest";
 import { parseDatabaseUrl, databasePoolConfig } from "../../src/lib/database-url";
@@ -22,7 +21,6 @@ describe.skipIf(!testUrl)("独立 PostgreSQL 测试库", () => {
     if (testConnection.database !== "simeval_test" || testUrl === process.env.DATABASE_URL) {
       throw new Error("集成测试只能连接独立的 simeval_test，不能连接开发库");
     }
-    if (!process.env.DEMO_PASSWORD) throw new Error("DEMO_PASSWORD is required for Seed");
 
     const environment = { ...process.env, DATABASE_URL: testUrl, DIRECT_URL: testUrl, DATABASE_URL_UNPOOLED: testUrl };
     execSync("npm run db:deploy", { env: environment, stdio: "pipe", timeout: 60_000 });
@@ -42,10 +40,10 @@ describe.skipIf(!testUrl)("独立 PostgreSQL 测试库", () => {
       process.env.DATABASE_URL = testUrl;
       vi.resetModules();
       const { seedDefaultData } = await import("../../prisma/seed-data");
-      await db.$transaction(tx => seedDefaultData(tx, process.env.DEMO_PASSWORD!), { timeout: 60_000 });
+      await db.$transaction(tx => seedDefaultData(tx), { timeout: 60_000 });
       const first = await snapshot();
       vi.resetModules();
-      await db.$transaction(tx => seedDefaultData(tx, process.env.DEMO_PASSWORD!), { timeout: 60_000 });
+      await db.$transaction(tx => seedDefaultData(tx), { timeout: 60_000 });
       const second = await snapshot();
 
       expect(second).toEqual(first);
@@ -106,14 +104,12 @@ describe.skipIf(!testUrl)("独立 PostgreSQL 测试库", () => {
       } finally {
         await getDb().$disconnect();
       }
-      const demoPassword = process.env.DEMO_PASSWORD;
-      if (!demoPassword) throw new Error("Seed demo password missing");
-      // 两个公开身份都能认证；历史管理员只保留数据，不成为第三个产品入口。
+      // 两个公开身份不保存个人密码；历史管理员只保留数据，不成为第三个产品入口。
       for (const id of ["demo-user-engineer", "demo-user-reviewer"]) {
         const account = await db.user.findUnique({ where: { id } });
         if (!account) throw new Error("Seed demo account missing");
         expect(isDemoAccount(account)).toBe(true);
-        expect(await compare(demoPassword, account.passwordHash)).toBe(true);
+        expect(account.passwordHash).toBeNull();
       }
       const administrator = await db.user.findUnique({ where: { id: "demo-user-admin" } });
       if (!administrator) throw new Error("Historical Seed administrator missing");

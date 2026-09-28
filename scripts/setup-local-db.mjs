@@ -29,15 +29,14 @@ async function main() {
     await admin.query('CREATE DATABASE "' + settings.database + '" OWNER "' + settings.user + '"');
   } finally { await admin.end(); }
   const databaseUrl = 'postgresql://' + settings.user + ':' + dbPassword + '@127.0.0.1:' + port + '/' + settings.database;
-  const demoPassword = mode === 'dev' ? randomBytes(24).toString('base64url') : null;
+  const accessPassword = mode === 'dev' ? randomBytes(24).toString('base64url') : null;
   const content = mode === 'dev'
-    ? '# 本地真实值，Git 已忽略。\nDATABASE_URL="' + databaseUrl + '"\nDIRECT_URL="' + databaseUrl + '"\nAUTH_SECRET="' + randomBytes(48).toString('base64url') + '"\nDEMO_PASSWORD="' + demoPassword + '"\n'
+    ? '# 本地真实值，Git 已忽略。\nDATABASE_URL="' + databaseUrl + '"\nDIRECT_URL="' + databaseUrl + '"\nAUTH_SECRET="' + randomBytes(48).toString('base64url') + '"\nACCESS_PASSWORD="' + accessPassword + '"\n'
     : '# 独立测试库，Git 已忽略。\nTEST_DATABASE_URL="' + databaseUrl + '"\n';
   await writeFile(settings.envFile, content, {flag:'wx',mode:0o600});
   const environment = {...process.env, DATABASE_URL:databaseUrl, DIRECT_URL:databaseUrl, DATABASE_URL_UNPOOLED:databaseUrl};
   delete environment.SIMEVAL_DB_ADMIN_PASSWORD;
   if (mode === 'dev') {
-    environment.DEMO_PASSWORD = demoPassword;
     for (const arguments_ of [['migrate','deploy'],['db','seed']]) execFileSync(process.execPath, ['node_modules/prisma/build/index.js',...arguments_], {env:environment,stdio:'inherit'});
     console.log('本地 PostgreSQL 与演示数据已准备好，运行 npm run dev。');
   } else console.log('独立 PostgreSQL 测试库已准备好，运行 npm run test:integration。');

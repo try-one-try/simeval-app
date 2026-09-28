@@ -2,8 +2,7 @@
 import type { PrismaClient } from "../src/generated/prisma/client";
 import { seedDefaultData } from "./seed-data";
 
-export async function resetDemoData(db: PrismaClient, demoPassword: string) {
-  if (!demoPassword) throw new Error("DEMO_PASSWORD is required for reset");
+export async function resetDemoData(db: PrismaClient) {
   await db.$transaction(async tx => {
     const projects = await tx.project.findMany({ select: { slug: true } });
     const users = await tx.user.findMany({ select: { isDemo: true } });
@@ -11,6 +10,7 @@ export async function resetDemoData(db: PrismaClient, demoPassword: string) {
       throw new Error("恢复只允许专用 SimEval 演示库，不能包含其他项目或真实用户。");
     }
     // 先删除引用方，再删除父记录；任务自关联先解除，不使用 DROP／TRUNCATE CASCADE。
+    await tx.accessAttempt.deleteMany();
     await tx.auditLog.deleteMany();
     await tx.aIReport.deleteMany();
     await tx.backfillTask.deleteMany();
@@ -26,6 +26,6 @@ export async function resetDemoData(db: PrismaClient, demoPassword: string) {
     await tx.modelVersion.deleteMany();
     await tx.project.deleteMany();
     await tx.user.deleteMany();
-    await seedDefaultData(tx, demoPassword);
+    await seedDefaultData(tx);
   }, { timeout: 60_000 });
 }

@@ -8,9 +8,9 @@
 
 选择模型／数据／Benchmark → 确认质量 → 创建并模拟执行 → 查看结果／按需比较基线 → 异常复核 → 生成并确认报告。
 
-产品只有算法工程师和评测人员，预设登录二选一、无注册；工程师管理本人任务和草稿，评测人员确认结论／报告。除创建外先选择任务，后续按钮延续当前任务；支持多任务、取消／重试／软删除。首次没有基线也应能评测；不做独立回补管理或人工分类步骤。
+产品只有算法工程师和评测人员，输入共享访问密码后选择演示身份、无注册；工程师管理本人任务和草稿，评测人员确认结论／报告。除创建外先选择任务，后续按钮延续当前任务；支持多任务、取消／重试／软删除。首次没有基线也应能评测；不做独立回补管理或人工分类步骤。
 
-**当前已实现双身份登录／切换、角色导航、自主配置与质量两步、无基线模拟、多任务单选／上下文延续、所选任务总览、取消／重试／软删除。** 同口径比较、异常证据下钻及自由结论草稿／确认／修改历史也已实现，共十四个业务 HTTP 操作。AI 报告生成／确认尚未开放，方案待重新讨论。合成数据、预置报告与模拟执行明确标注，不运行真实仿真或训练。
+**当前已实现访问密码入口、双身份登录／切换、角色导航、自主配置与质量两步、无基线模拟、多任务单选／上下文延续、所选任务总览、取消／重试／软删除。** 同口径比较、异常证据下钻及自由结论草稿／确认／修改历史也已实现，共十四个业务 HTTP 操作。AI 报告生成／确认尚未开放，方案待重新讨论。合成数据、预置报告与模拟执行明确标注，不运行真实仿真或训练。
 
 质量检查、实际验证证据与待验步骤见各规格 quickstart。目标是在几分钟内看懂“总体提升但遮挡回退 → 日志证据 → 人工确认”。部署与首次访问计时仍待完成。
 
@@ -20,7 +20,7 @@
 
 | 内容 | 入口 |
 |---|---|
-| 产品与交互 | [Figma 原型](https://www.figma.com/design/Y2ZIhN1yuuXBeieGkxtnsH/simeval?node-id=43-2)，预设交互不等于业务实现 |
+| 产品与交互 | [Figma 现行工程页](https://www.figma.com/design/Y2ZIhN1yuuXBeieGkxtnsH/simeval?node-id=371-484)；访问密码登录参考[设计画框](https://www.figma.com/design/Y2ZIhN1yuuXBeieGkxtnsH/simeval?node-id=197-476) |
 | 评测与任务规格 | [需求](specs/002-quality-evaluation/spec.md) → [计划](specs/002-quality-evaluation/plan.md) → [任务](specs/002-quality-evaluation/tasks.md) → [验收](specs/002-quality-evaluation/quickstart.md) |
 | 比较与复核规格 | [需求](specs/003-comparison-review/spec.md) → [计划](specs/003-comparison-review/plan.md) → [任务](specs/003-comparison-review/tasks.md) → [验收](specs/003-comparison-review/quickstart.md) |
 | 架构与数据 | [架构设计](docs/architecture.md)，分层、事务与迁移说明 |
@@ -38,12 +38,23 @@
 
 **已有 MySQL 配置需先备份并改为 PostgreSQL。** 旧数据库保留，新库使用默认故事；原迁移归档，没有自动搬迁临时任务。配置、测试、Vercel 发布和后台恢复详见[运行与部署验收](specs/004-deployment/quickstart.md)，方案与进度见[部署规格](specs/004-deployment/spec.md)、[计划](specs/004-deployment/plan.md)、[任务](specs/004-deployment/tasks.md)。
 
+### 手动恢复默认演示数据
+
+在 `simeval-app/` 的 PowerShell 中，按目标**只运行其中一条**：
+
+```powershell
+.\scripts\reset-dev-demo.ps1         # Neon dev 分支
+.\scripts\reset-production-demo.ps1  # Neon Production；运行时还需输入确认词
+```
+
+首次使用先在所选命令后加 `--check` 核对目标；检查不会连接数据库或修改数据。恢复会清除新增任务和人工改动，再写回默认 Seed。详细步骤与防误操作说明见[部署验收文档](specs/004-deployment/quickstart.md#3-负责人手动恢复)。
+
 | 配置／文件 | 作用 |
 |---|---|
 | .env.example／.env.local | 公开模板／本地真实值；真实配置被 Git 忽略 |
 | DATABASE_URL | 网页连接池地址，含数据库账号密码；不能放入 NEXT_PUBLIC 变量 |
 | DIRECT_URL／DATABASE_URL_UNPOOLED | 迁移、Seed 和维护用的直连，优先前者；本机可与运行地址相同 |
-| AUTH_SECRET／DEMO_PASSWORD | 会话密钥／演示账号口令；不用于数据库连接 |
+| AUTH_SECRET／ACCESS_PASSWORD | 会话密钥／访客输入的共享访问密码；均不用于数据库连接 |
 | prisma7.config.ts／prisma/schema.prisma | CLI 配置与路径／表、关系、索引 |
 | src/server/db.ts／prisma/migrations | 网页客户端与连接池／当前 PostgreSQL 迁移 |
 | next.config.ts／postcss.config.mjs | Next.js 配置／Tailwind 处理 |
@@ -58,7 +69,7 @@
 | npm run db:migrate | 修改 Schema 后生成新迁移；仅开发环境，需要 shadow database 权限 |
 | npm run db:generate | Schema 变化后生成 Prisma Client，随后重启服务 |
 | npm run db:seed／db:catalog | 首次故事初始化／增量补缺项；都不等于完整清理 |
-| npm run db:reset-demo -- --confirm=RESET_DEMO_DATA | 负责人手动恢复专用演示库，先核对库名；网站无入口 |
+| .\scripts\reset-dev-demo.ps1／reset-production-demo.ps1 | 分别恢复 Neon dev／Production 的默认 Seed；先用 `--check` 核对目标，详见部署验收 |
 | npm run lint／typecheck／test:unit | 静态、类型和单元检查 |
 | npm run test:integration | 独立 simeval_test 上的真实数据库验证；无配置时失败 |
 | npm run build／start | 生产构建／本地运行构建；可信本机预览设置 AUTH_TRUST_HOST=true |

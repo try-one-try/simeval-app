@@ -12,7 +12,7 @@ Next.js、TypeScript、Auth.js、Prisma、PostgreSQL 组成模块化单体，一
 |---|---|
 | `src/app/(workspace)/` | 核对会话，组合各板块页面 |
 | `src/lib/demo-identity.ts`、`src/lib/workspace-navigation.ts` | 公开身份、入口和导航定义；不含口令 |
-| `src/server/auth/`、`src/auth.ts` | 身份 Zod／账号／密码摘要校验，Auth.js JWT 会话，页面门禁 |
+| `src/server/auth/`、`src/auth.ts` | 访问密码与身份校验，Auth.js 限时 JWT 会话，页面门禁 |
 | `src/features/identity/`、`src/app/login/` | 原生单选组与切换弹层；Server Action 建立对应会话 |
 | `src/features/` | 表单、任务选择、结果与交互状态；客户端不访问 Prisma |
 | `src/app/api/`、`src/server/http/api.ts` | HTTP 入口；身份／角色／Origin／Zod、统一错误和 requestId |
@@ -35,7 +35,7 @@ flowchart LR
   R --> DB[(PostgreSQL)]
 ~~~
 
-登录／切换走 Server Action：所选身份 → 服务端读取演示口令 → Credentials 核对预设 email、isDemo、数据库角色和 bcrypt 摘要 → Auth.js 更新 Cookie → 角色默认页。页面与 HTTP 每次用会话 userId 重新查数据库；历史 ADMIN 或不匹配账号视为失效。切换前不退出原账号，认证失败仍可返回原会话。
+登录／切换走 Server Action：访客选择身份并输入访问密码 → Credentials 在服务端核对 `ACCESS_PASSWORD` 和预设账号 → Auth.js 签发带授权时间的 JWT Cookie → 角色默认页。相同来源 15 分钟内输错 5 次暂停 15 分钟；数据库只保存来源摘要和失败窗口。会话最多 12 小时；旧令牌没有授权时间会失效。页面与 HTTP 每次用会话 userId 重新查数据库；历史 ADMIN 或不匹配账号视为失效。切换前先核对当前会话，再由服务端重建目标身份会话，不要求访客重输密码。
 
 首屏由 Server Component 直接调用应用服务；业务交互通过 HTTP。当前 Mock 在事务内只做本地纯计算；未来外部执行与 AI 网络请求放到事务外，校验结果后用短事务保存。
 

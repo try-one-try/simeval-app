@@ -1,12 +1,11 @@
 // 固定故事的写入逻辑：由调用方提供事务，初始化与完整恢复共用同一份数据。
 import type { Prisma } from "../src/generated/prisma/client";
-import { hash, compare } from "bcryptjs";
 import { seedCatalogData } from "./catalog";
 import { MODEL_FAMILY_NAME, DEMO_RUN_NAMES, datasets } from "../src/domain/evaluation-catalog";
 
 const at = (hour: number, minute = 0) => new Date(Date.UTC(2026, 8, 1, hour, minute));
 
-async function seedUsers(db: Prisma.TransactionClient, demoPassword: string) {
+async function seedUsers(db: Prisma.TransactionClient) {
   const accounts = [
     { id: "demo-user-engineer", email: "engineer@demo.simeval.local", name: "林工", role: "ENGINEER" as const },
     { id: "demo-user-reviewer", email: "reviewer@demo.simeval.local", name: "陈复核", role: "REVIEWER" as const },
@@ -14,15 +13,11 @@ async function seedUsers(db: Prisma.TransactionClient, demoPassword: string) {
   ];
 
   for (const account of accounts) {
-    const existing = await db.user.findUnique({ where: { email: account.email } });
-    // 数据库只存 bcrypt 摘要；重复 Seed 且口令未变时复用旧摘要。
-    const passwordHash = existing && await compare(demoPassword, existing.passwordHash)
-      ? existing.passwordHash
-      : await hash(demoPassword, 12);
+    // 演示身份不再持有个人密码；重复 Seed 同时清除旧演示口令摘要。
     await db.user.upsert({
       where: { email: account.email },
-      create: { ...account, passwordHash, isDemo: true },
-      update: { name: account.name, role: account.role, passwordHash, isDemo: true },
+      create: { ...account, passwordHash: null, isDemo: true },
+      update: { name: account.name, role: account.role, passwordHash: null, isDemo: true },
     });
   }
 }
@@ -166,9 +161,8 @@ async function seedStory(tx: Prisma.TransactionClient) {
     }
 }
 
-export async function seedDefaultData(tx: Prisma.TransactionClient, demoPassword: string) {
-  if (!demoPassword) throw new Error("DEMO_PASSWORD is required for Seed");
-  await seedUsers(tx, demoPassword);
+export async function seedDefaultData(tx: Prisma.TransactionClient) {
+  await seedUsers(tx);
   await seedStory(tx);
   await seedCatalogData(tx);
 }

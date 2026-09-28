@@ -8,6 +8,5 @@ export function validateDemoReset(environment: Readonly<Record<string, string | 
   if (!environment.DEMO_RESET_DATABASE || environment.DEMO_RESET_DATABASE !== database || ["postgres", "template0", "template1"].includes(database)) {
     throw new Error("请将 DEMO_RESET_DATABASE 设置为专用演示库名，并核对直连地址。");
   }
-  if (!environment.DEMO_PASSWORD) throw new Error("DEMO_PASSWORD is required for reset");
-  return { url, database, demoPassword: environment.DEMO_PASSWORD };
+  return { url, database };
 }

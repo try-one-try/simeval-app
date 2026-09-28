@@ -1,28 +1,32 @@
-// 网页身份认证：从用户表读 passwordHash，与提交的演示口令比较；它不使用数据库连接密码。
+// 演示门禁：访问密码仅在服务端核验，JWT 只保存获准访问的账号与时间。
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { authenticateDemo } from "@/server/auth/authenticate-demo";
+import { ACCESS_SESSION_MAX_AGE_SECONDS, hasActiveAccessGrant } from "@/server/auth/access-grant";
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: ACCESS_SESSION_MAX_AGE_SECONDS },
   pages: { signIn: "/login" },
   providers: [
     Credentials({
       credentials: {
-        email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" },
         role: { label: "Demo role", type: "text" },
+        accessPassword: { label: "Access password", type: "password" },
       },
       authorize: authenticateDemo,
     }),
   ],
   callbacks: {
     jwt({ token, user }) {
-      if (user) token.sub = user.id;
+      if (user) {
+        token.sub = user.id;
+        token.accessGrantedAt = Date.now();
+      }
       return token;
     },
     session({ session, token }) {
-      if (session.user && token.sub) session.user.id = token.sub;
+      // 旧版无需访问密码的令牌没有授权时间，不能继续进入工作台。
+      if (session.user) session.user.id = hasActiveAccessGrant(token.accessGrantedAt) && token.sub ? token.sub : "";
       return session;
     },
   },
