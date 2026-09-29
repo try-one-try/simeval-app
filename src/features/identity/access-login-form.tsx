@@ -1,7 +1,8 @@
 "use client";
 
-// 身份单选与下划线密码字段来自设计稿；错误状态不回传或保存用户输入。
-import { useActionState } from "react";
+// 身份单选与下划线密码字段来自设计稿；只切换可见状态，不在组件状态中保存密码。
+import { useActionState, useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { enterDemo, type DemoLoginState } from "@/server/auth/actions";
 import { type DemoRole } from "@/lib/demo-identity";
 import { IdentityFields } from "@/features/identity/identity-fields";
@@ -9,12 +10,18 @@ import { DemoSubmit } from "@/components/demo-submit";
 
 export function AccessLoginForm({ initialRole, initialError }: { initialRole: DemoRole; initialError: DemoLoginState["error"] }) {
   const [state, action] = useActionState(enterDemo, { error: initialError });
+  const [passwordVisible, setPasswordVisible] = useState(false);
   const invalidPassword = state.error === "password";
   return <form action={action}>
     <IdentityFields initialRole={initialRole} />
     <div className="access-password-field">
       <label htmlFor="access-password">访问密码</label>
-      <input id="access-password" name="accessPassword" type="password" placeholder="请输入访问密码" autoComplete="current-password" maxLength={256} required aria-invalid={invalidPassword} aria-describedby="access-password-help" />
+      <div className="access-password-control">
+        <input id="access-password" name="accessPassword" type={passwordVisible ? "text" : "password"} placeholder="请输入访问密码" autoComplete="current-password" maxLength={256} required aria-invalid={invalidPassword} aria-describedby="access-password-help" />
+        <button className="access-password-visibility" type="button" aria-label={passwordVisible ? "隐藏访问密码" : "显示访问密码"} aria-pressed={passwordVisible} onClick={() => setPasswordVisible((visible) => !visible)}>
+          {passwordVisible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
+        </button>
+      </div>
       <p id="access-password-help" className={invalidPassword ? "access-password-error" : ""} role={invalidPassword ? "alert" : undefined}>
         {invalidPassword ? "访问密码不正确，请重试。" : "仅首次进入时填写，切换身份无需重复输入。"}
       </p>

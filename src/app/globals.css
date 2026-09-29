@@ -248,8 +248,12 @@ button:disabled { cursor:not-allowed; }
 .identity-entry .identity-fields { margin-bottom:16px; }
 .access-password-field { display:grid; min-height:88px; align-content:start; margin-bottom:16px; }
 .access-password-field label { color:var(--faint); font-size:11px; }
-.access-password-field input { display:block; width:100%; min-height:37px; padding:7px 0 6px; border:0; border-bottom:1px solid var(--line); border-radius:0; background:transparent; color:var(--ink); font-size:15px; font-weight:500; }
+.access-password-control { position:relative; }
+.access-password-field input { display:block; width:100%; min-height:44px; padding:7px 48px 6px 0; border:0; border-bottom:1px solid var(--line); border-radius:0; background:transparent; color:var(--ink); font-size:15px; font-weight:500; }
 .access-password-field input::placeholder { color:var(--ink); opacity:1; }
+.access-password-field input::-ms-reveal { display:none; }
+.access-password-visibility { position:absolute; right:0; bottom:0; display:grid; place-items:center; width:44px; height:44px; border:0; background:transparent; color:var(--muted); cursor:pointer; }
+.access-password-visibility:hover,.access-password-visibility:focus-visible { color:var(--ink); }
 .access-password-field p { margin-top:9px; color:var(--muted); font-size:11px; }
 .access-password-field p.access-password-error { color:var(--alert); }
 .identity-trigger { border:0; border-radius:6px; background:var(--soft); color:var(--muted); min-height:44px; padding:10px 14px; text-align:left; font-size:13px; flex-shrink:0; }
