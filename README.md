@@ -4,7 +4,7 @@
 
 ## 产品与真实状态
 
-**2026-09-27：阶段 3–4 已验收；阶段 5 已提交；当前准备先部署上线，再打磨主页，最后完成 AI 报告 Agent。** 目标流程是：
+**当前阶段 3–5 的核心业务已实现，阶段 6 的部署版本已上线；主页与 AI 报告仍待完善。** 目标流程是：
 
 选择模型／数据／Benchmark → 确认质量 → 创建并模拟执行 → 查看结果／按需比较基线 → 异常复核 → 生成并确认报告。
 
@@ -12,14 +12,17 @@
 
 **当前已实现访问密码入口、双身份登录／切换、角色导航、自主配置与质量两步、无基线模拟、多任务单选／上下文延续、所选任务总览、取消／重试／软删除。** 同口径比较、异常证据下钻及自由结论草稿／确认／修改历史也已实现，共十四个业务 HTTP 操作。AI 报告生成／确认尚未开放，方案待重新讨论。合成数据、预置报告与模拟执行明确标注，不运行真实仿真或训练。
 
-质量检查、实际验证证据与待验步骤见各规格 quickstart。目标是在几分钟内看懂“总体提升但遮挡回退 → 日志证据 → 人工确认”。部署与首次访问计时仍待完成。
+质量检查、实际验证证据与待验步骤见各规格 quickstart。目标是在几分钟内看懂“总体提升但遮挡回退 → 日志证据 → 人工确认”。首次访问计时仍待最终验收。
 
 新环境预置 10 条英文命名的核心合成任务，两页 6＋4，覆盖多版本比较、复核历史、失败／重试、取消、不同数据与专项评测。已有环境用 `npm run db:catalog` 补缺项，保留人工内容；详情见[核心演示集](specs/002-quality-evaluation/spec.md#核心演示集)。固定示例受保护，可另建任务体验取消／重试／删除。
 
-## 面试官从哪里看
+## 项目文档
+
+产品范围和验收口径见 [PRD](docs/PRD.md)；代码分层、数据关系、全部接口和请求示例见 [技术架构与 API 文档](docs/架构与接口.md)。两份文档均可独立阅读。
 
 | 内容 | 入口 |
 |---|---|
+| 产品与技术文档 | [PRD](docs/PRD.md)、[技术架构与 API](docs/架构与接口.md) |
 | 产品与交互 | [Figma 现行工程页](https://www.figma.com/design/Y2ZIhN1yuuXBeieGkxtnsH/simeval?node-id=371-484)；访问密码登录参考[设计画框](https://www.figma.com/design/Y2ZIhN1yuuXBeieGkxtnsH/simeval?node-id=197-476) |
 | 评测与任务规格 | [需求](specs/002-quality-evaluation/spec.md) → [计划](specs/002-quality-evaluation/plan.md) → [任务](specs/002-quality-evaluation/tasks.md) → [验收](specs/002-quality-evaluation/quickstart.md) |
 | 比较与复核规格 | [需求](specs/003-comparison-review/spec.md) → [计划](specs/003-comparison-review/plan.md) → [任务](specs/003-comparison-review/tasks.md) → [验收](specs/003-comparison-review/quickstart.md) |
@@ -32,7 +35,7 @@
 
 ## 本地运行与检查
 
-采用 Next.js、TypeScript、Prisma 7、PostgreSQL 和 Auth.js。部署方案为 Vercel＋Neon；代码适配已通过本地检查，云端待配置。Neon 提供云数据库，本机不必安装 PostgreSQL。
+采用 Next.js、TypeScript、Prisma 7、PostgreSQL 和 Auth.js。线上使用 Vercel＋Neon；Neon 提供云数据库，本机不必安装 PostgreSQL。
 
 首次：`npm ci` → 复制 `.env.example` 为 `.env.local` 并填开发库连接与密钥 → `npm run db:deploy` → `npm run db:seed` → `npm run dev`。平时只需 `npm run dev`，看到 Ready 后访问 localhost:3000。
 
@@ -74,4 +77,4 @@
 | npm run test:integration | 独立 simeval_test 上的真实数据库验证；无配置时失败 |
 | npm run build／start | 生产构建／本地运行构建；可信本机预览设置 AUTH_TRUST_HOST=true |
 
-GitHub Actions 使用独立 PostgreSQL 检查 lint、类型、单元、集成和构建。Vercel 的发布与访问保护需另行配置；普通构建不自动清理数据库。网页由负责人按[评测验收](specs/002-quality-evaluation/quickstart.md)与[比较复核验收](specs/003-comparison-review/quickstart.md)检查，不引入自动浏览器测试框架。AI 报告仍待后续实施。
+GitHub Actions 使用独立 PostgreSQL 检查 lint、类型、单元、集成和构建。Vercel 的发布与访问保护在平台控制台管理；普通构建不自动清理数据库。网页由负责人按[评测验收](specs/002-quality-evaluation/quickstart.md)与[比较复核验收](specs/003-comparison-review/quickstart.md)检查，不引入自动浏览器测试框架。AI 报告仍待后续实施。
