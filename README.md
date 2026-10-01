@@ -18,11 +18,12 @@
 
 ## 项目文档
 
-产品范围和验收口径见 [PRD](docs/PRD.md)；代码分层、数据关系、全部接口和请求示例见 [技术架构与 API 文档](docs/架构与接口.md)。两份文档均可独立阅读。
+产品范围和验收口径见 [PRD](docs/PRD.md)；代码分层、数据关系、全部接口和请求示例见 [技术架构与 API 文档](docs/架构与接口.md)；从产品定义到上线的实际过程见 [项目开发流程](docs/开发流程.md)。三份文档均可独立阅读。
 
 | 内容 | 入口 |
 |---|---|
 | 产品与技术文档 | [PRD](docs/PRD.md)、[技术架构与 API](docs/架构与接口.md) |
+| 开发过程 | [项目开发流程](docs/开发流程.md)，阶段交付、验证证据、技术取舍与待完成项 |
 | 产品与交互 | [Figma 现行工程页](https://www.figma.com/design/Y2ZIhN1yuuXBeieGkxtnsH/simeval?node-id=371-484)；访问密码登录参考[设计画框](https://www.figma.com/design/Y2ZIhN1yuuXBeieGkxtnsH/simeval?node-id=197-476) |
 | 评测与任务规格 | [需求](specs/002-quality-evaluation/spec.md) → [计划](specs/002-quality-evaluation/plan.md) → [任务](specs/002-quality-evaluation/tasks.md) → [验收](specs/002-quality-evaluation/quickstart.md) |
 | 比较与复核规格 | [需求](specs/003-comparison-review/spec.md) → [计划](specs/003-comparison-review/plan.md) → [任务](specs/003-comparison-review/tasks.md) → [验收](specs/003-comparison-review/quickstart.md) |
