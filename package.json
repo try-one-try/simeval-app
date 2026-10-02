@@ -27,16 +27,22 @@
   },
   "license": "UNLICENSED",
   "dependencies": {
+    "@assistant-ui/react": "0.15.23",
+    "@langchain/core": "1.2.14",
+    "@langchain/openai": "1.6.2",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
     "bcryptjs": "3.0.3",
+    "langchain": "1.5.15",
     "lucide-react": "1.47.0",
     "next": "16.3.6",
     "next-auth": "5.0.0-beta.32",
     "pg": "8.16.3",
     "react": "19.3.0",
     "react-dom": "19.3.0",
+    "react-markdown": "10.1.0",
     "server-only": "0.0.1",
+    "undici": "6.29.0",
     "zod": "4.6.5"
   },
   "devDependencies": {

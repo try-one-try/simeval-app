@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: SimEval HTTP API
-  version: 0.6.0
-  description: 合成数据与模拟执行。质量／评测／比较／异常复核14项操作已实现；报告、指派／重开为planned，报告方案待重新讨论。
+  version: 0.8.0
+  description: 合成数据与模拟执行；23 项业务操作已实现，指派和重开 2 项为 planned。新增真实 Agent 和证据报告，本地手工验收与生产发布待完成。
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 tags:
 - name: Catalog
@@ -17,6 +17,8 @@ tags:
   description: 异常样本与复核
 - name: Report
   description: AI 报告与人工确认
+- name: Assistant
+  description: 登录隔离的评测调查与有限执行
 security:
 - sessionCookie: []
 paths:
@@ -572,18 +574,315 @@ paths:
         422:
           $ref: '#/components/responses/Unprocessable'
       x-design-status: needs-detail
-  /api/ai-reports:
+  /api/assistant/sessions:
+    get:
+      tags:
+        - Assistant
+      operationId: listAssistantSessions
+      x-implementation-status: implemented
+      x-roles:
+        - ENGINEER
+        - REVIEWER
+      summary: 当前登录的对话，最多 40 条
+      responses:
+        '200':
+          description: 成功；重复请求返回已存在记录
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AssistantSession'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '500':
+          $ref: '#/components/responses/InternalError'
     post:
       tags:
-      - Report
-      operationId: createAiReport
-      x-implementation-status: planned
-      summary: 同步生成并校验证据化 AI 报告草稿
+        - Assistant
+      operationId: createAssistantSession
+      x-implementation-status: implemented
       x-roles:
-      - ENGINEER
-      - REVIEWER
+        - ENGINEER
+        - REVIEWER
+      summary: 绑定成功任务与可选基线；不调用模型
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAssistantSession'
+      responses:
+        '200':
+          description: 成功；重复请求返回已存在记录
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: '#/components/schemas/AssistantSession'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '429':
+          description: 本次登录对话已达 40 个
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/assistant/sessions/{sessionId}:
+    get:
+      tags:
+        - Assistant
+      operationId: getAssistantSession
+      x-implementation-status: implemented
+      x-roles:
+        - ENGINEER
+        - REVIEWER
+      summary: 恢复当前登录的历史并标记过时回答
       parameters:
-      - $ref: '#/components/parameters/IdempotencyKey'
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ResourceId'
+      responses:
+        '200':
+          description: 成功；重复请求返回已存在记录
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: object
+                    required:
+                      - session
+                      - turns
+                    properties:
+                      session:
+                        $ref: '#/components/schemas/AssistantSession'
+                      turns:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/AssistantTurn'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/assistant/sessions/{sessionId}/messages:
+    post:
+      tags:
+        - Assistant
+      operationId: sendAssistantMessage
+      x-implementation-status: implemented
+      x-roles:
+        - ENGINEER
+        - REVIEWER
+      summary: 发送新问题并返回逐行 JSON 流
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ResourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendAssistantMessage'
+      responses:
+        '200':
+          description: 每行独立 AssistantEvent，以换行结尾；不是单个 JSON 数组，也不是 SSE
+          content:
+            application/x-ndjson:
+              schema:
+                $ref: '#/components/schemas/AssistantEvent'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '413':
+          description: 声明的请求体过大
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '429':
+          description: 频率、并发或累计预算上限
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '503':
+          description: 模型或预算配置不正确
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+      description: >-
+        仅发送新问题，历史与角色由服务器读取。requestKey 必须为 UUID；同会话同键同问题和样本不重复调用，不同内容 409。60 秒、最多 6 次模型／8 次工具；单次登录仅一轮运行。流开始后失败也以 HTTP 200
+        内的 done 终态或 error 事件返回，不能只检查 HTTP 状态。
+  /api/assistant/sessions/{sessionId}/turns/{turnId}/stop:
+    post:
+      tags:
+        - Assistant
+      operationId: stopAssistantTurn
+      x-implementation-status: implemented
+      x-roles:
+        - ENGINEER
+        - REVIEWER
+      summary: 停止自己的轮次；终态不会被晚到成功覆盖
+      parameters:
+        - name: sessionId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ResourceId'
+        - name: turnId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ResourceId'
+      responses:
+        '200':
+          description: 成功；重复请求返回已存在记录
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: object
+                    required:
+                      - stopped
+                    properties:
+                      stopped:
+                        type: boolean
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /api/ai-reports:
+    get:
+      tags:
+        - Report
+      operationId: listAiReports
+      x-implementation-status: implemented
+      x-roles:
+        - ENGINEER
+        - REVIEWER
+      summary: 当前任务共享报告，最近 30 条
+      parameters:
+        - name: runId
+          in: query
+          required: true
+          schema:
+            $ref: '#/components/schemas/ResourceId'
+      responses:
+        '200':
+          description: 成功；重复请求返回已存在记录
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Report'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    post:
+      tags:
+        - Report
+      operationId: createAiReport
+      x-implementation-status: implemented
+      x-roles:
+        - ENGINEER
+        - REVIEWER
+      summary: 从自己的成功轮次保存当前任务证据报告
       requestBody:
         required: true
         content:
@@ -591,79 +890,120 @@ paths:
             schema:
               $ref: '#/components/schemas/CreateReportRequest'
       responses:
-        200:
-          description: 相同幂等请求返回已有报告
+        '200':
+          description: 成功；重复请求返回已存在记录
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReportEnvelope'
-        201:
-          description: 已保存 READY 草稿
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ReportEnvelope'
-        401:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Report'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        409:
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
           $ref: '#/components/responses/Conflict'
-        422:
+        '422':
           $ref: '#/components/responses/Unprocessable'
-        503:
-          $ref: '#/components/responses/ExternalServiceError'
-      description: 服务端组装选定任务的指标、样本证据与确认版本，可无基线；验证结构／引用后存草稿。网络请求不在数据库事务内，缓存／降级标明来源。
+        '500':
+          $ref: '#/components/responses/InternalError'
+      description: >-
+        请求含 sessionId 和 turnId，不接收客户端生成的报告文本。按操作者与来源轮次去重；首次和重复均 200。读取当前任务指标与人工结论套模板，不额外调用模型，不公开私聊和比较文本。来源已变化返回 409
+        SOURCE_CHANGED。
   /api/ai-reports/{reportId}:
     get:
       tags:
-      - Report
+        - Report
       operationId: getAiReport
-      x-implementation-status: planned
-      summary: 获取报告及引用的指标与样本编号
+      x-implementation-status: implemented
       x-roles:
-      - ENGINEER
-      - REVIEWER
+        - ENGINEER
+        - REVIEWER
+      summary: 读取共享报告与来源过时状态
       parameters:
-      - $ref: '#/components/parameters/ReportId'
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ResourceId'
       responses:
-        200:
-          description: 报告详情
+        '200':
+          description: 成功；重复请求返回已存在记录
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReportEnvelope'
-        401:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Report'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        404:
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/ai-reports/{reportId}/confirm:
     post:
       tags:
-      - Report
+        - Report
       operationId: confirmAiReport
-      x-implementation-status: planned
-      summary: 人工确认 READY 报告
+      x-implementation-status: implemented
       x-roles:
-      - REVIEWER
+        - REVIEWER
+      summary: 评测人员复查来源并确认报告
       parameters:
-      - $ref: '#/components/parameters/ReportId'
+        - name: reportId
+          in: path
+          required: true
+          schema:
+            $ref: '#/components/schemas/ResourceId'
       responses:
-        200:
-          description: 已确认报告
+        '200':
+          description: 成功；重复请求返回已存在记录
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReportEnvelope'
-        401:
+                type: object
+                required:
+                  - data
+                  - meta
+                properties:
+                  data:
+                    $ref: '#/components/schemas/Report'
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+        '401':
           $ref: '#/components/responses/Unauthorized'
-        403:
+        '403':
           $ref: '#/components/responses/Forbidden'
-        404:
+        '404':
           $ref: '#/components/responses/NotFound'
-        409:
+        '409':
           $ref: '#/components/responses/Conflict'
-        422:
+        '422':
           $ref: '#/components/responses/Unprocessable'
-      description: 仅 REVIEWER；READY 且来源版本仍有效才可确认，过时或并发变更返回 409，保留历史。
+        '500':
+          $ref: '#/components/responses/InternalError'
   /api/evaluation-catalog:
     get:
       tags:
@@ -1382,94 +1722,357 @@ components:
           $ref: '#/components/schemas/SampleDetail'
         meta:
           $ref: '#/components/schemas/RequestMeta'
-    CreateReportRequest:
+    CreateAssistantSession:
       type: object
-      additionalProperties: false
       required:
-      - runId
+        - runId
       properties:
         runId:
+          $ref: '#/components/schemas/ResourceId'
+        baselineRunId:
+          type:
+            - string
+            - 'null'
+          default: null
+      additionalProperties: false
+    SendAssistantMessage:
+      type: object
+      required:
+        - question
+        - requestKey
+      properties:
+        question:
+          type: string
+          minLength: 1
+          maxLength: 2000
+          description: trim 后校验
+        requestKey:
+          type: string
+          format: uuid
+        sampleId:
+          type:
+            - string
+            - 'null'
+          default: null
+          description: 当前页面样本提示；服务端工具核对其归属
+      additionalProperties: false
+    AssistantSession:
+      type: object
+      required:
+        - id
+        - title
+        - runId
+        - runName
+        - baselineRunId
+        - baselineName
+        - updatedAt
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        runId:
+          type: string
+        runName:
           type: string
         baselineRunId:
           type:
-          - string
-          - 'null'
-          description: 可不选；若提供须成功且同口径
+            - string
+            - 'null'
+        baselineName:
+          type:
+            - string
+            - 'null'
+        updatedAt:
+          type: string
+          format: date-time
+    AssistantEvidence:
+      type: object
+      required:
+        - id
+        - title
+        - href
+        - kind
+        - summary
+        - capturedAt
+        - snapshot
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        href:
+          type: string
+          description: 服务端构造的站内证据链接
+        kind:
+          type: string
+          enum:
+            - summary
+            - comparison
+            - samples
+            - sample
+        summary:
+          type: string
+        capturedAt:
+          type: string
+          format: date-time
+        snapshot:
+          description: 本轮工具实际取得的数据快照
+    AssistantTrace:
+      type: object
+      required:
+        - id
+        - tool
+        - label
+        - input
+        - status
+        - durationMs
+        - summary
+      properties:
+        id:
+          type: string
+        tool:
+          type: string
+        label:
+          type: string
+        input:
+          type: string
+          description: 查询参数的 JSON 字符串
+        status:
+          type: string
+          enum:
+            - running
+            - success
+            - error
+        durationMs:
+          type: integer
+          minimum: 0
+        summary:
+          type: string
+    AssistantTurn:
+      type: object
+      required:
+        - id
+        - requestKey
+        - question
+        - answer
+        - status
+        - errorMessage
+        - evidence
+        - traces
+        - createdAt
+        - model
+        - inputTokens
+        - outputTokens
+        - stale
+      properties:
+        id:
+          type: string
+        requestKey:
+          type: string
+        question:
+          type: string
+        answer:
+          type:
+            - string
+            - 'null'
+        status:
+          type: string
+          enum:
+            - RUNNING
+            - SUCCEEDED
+            - FAILED
+            - CANCELLED
+            - TIMED_OUT
+        errorMessage:
+          type:
+            - string
+            - 'null'
+        evidence:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssistantEvidence'
+        traces:
+          type: array
+          items:
+            $ref: '#/components/schemas/AssistantTrace'
+        createdAt:
+          type: string
+          format: date-time
+        model:
+          type: string
+        inputTokens:
+          type:
+            - integer
+            - 'null'
+        outputTokens:
+          type:
+            - integer
+            - 'null'
+        stale:
+          type: boolean
+    AssistantEvent:
+      oneOf:
+        - type: object
+          required:
+            - type
+            - turnId
+          properties:
+            type:
+              const: start
+            turnId:
+              type: string
+        - type: object
+          required:
+            - type
+            - trace
+          properties:
+            type:
+              const: trace
+            trace:
+              $ref: '#/components/schemas/AssistantTrace'
+        - type: object
+          required:
+            - type
+            - delta
+          properties:
+            type:
+              const: text
+            delta:
+              type: string
+        - type: object
+          required:
+            - type
+            - turn
+          properties:
+            type:
+              const: done
+            turn:
+              $ref: '#/components/schemas/AssistantTurn'
+        - type: object
+          required:
+            - type
+            - code
+            - message
+          properties:
+            type:
+              const: error
+            code:
+              type: string
+            message:
+              type: string
+    CreateReportRequest:
+      type: object
+      required:
+        - sessionId
+        - turnId
+      properties:
+        sessionId:
+          $ref: '#/components/schemas/ResourceId'
+        turnId:
+          $ref: '#/components/schemas/ResourceId'
+      additionalProperties: false
     Report:
       type: object
       required:
-      - id
-      - runId
-      - baselineRunId
-      - status
-      - summary
-      - findings
-      - evidenceSampleIds
-      - provider
-      - isStale
-      - sourceReviewVersions
+        - id
+        - runId
+        - status
+        - isStale
+        - createdAt
+        - confirmedAt
+        - model
+        - output
       properties:
         id:
           type: string
         runId:
           type: string
-        baselineRunId:
-          type:
-          - string
-          - 'null'
         status:
-          $ref: '#/components/schemas/ReportStatus'
+          type: string
+          enum:
+            - READY
+            - CONFIRMED
+        isStale:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        confirmedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        model:
+          type:
+            - string
+            - 'null'
+        output:
+          $ref: '#/components/schemas/ReportOutput'
+    ReportOutput:
+      type: object
+      required:
+        - version
+        - title
+        - summary
+        - metrics
+        - findings
+        - limitations
+        - sourceTurnId
+      properties:
+        version:
+          const: 1
+        title:
+          type: string
         summary:
           type: string
+        metrics:
+          type: array
+          items:
+            type: object
+            required:
+              - name
+              - scenario
+              - value
+              - unit
+            properties:
+              name:
+                type: string
+              scenario:
+                type: string
+              value:
+                type: number
+              unit:
+                type: string
         findings:
           type: array
           items:
             type: object
             required:
-            - summary
-            - evidenceSampleIds
+              - sampleId
+              - label
+              - conclusion
+              - confirmed
             properties:
-              summary:
+              sampleId:
                 type: string
-              evidenceSampleIds:
-                type: array
-                items:
-                  type: string
-        evidenceSampleIds:
+              label:
+                type: string
+              conclusion:
+                type: string
+              confirmed:
+                type: boolean
+        limitations:
           type: array
           items:
             type: string
-        provider:
+        sourceTurnId:
           type: string
-          example: cached
-        confirmedById:
-          type:
-          - string
-          - 'null'
-        confirmedAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        isStale:
-          type: boolean
-          description: 来源确认版本变更；过时报告保留历史但不能确认或冒充当前结论
-        staleAt:
-          type:
-          - string
-          - 'null'
-          format: date-time
-        sourceReviewVersions:
-          type: object
-          additionalProperties:
-            type: integer
-            minimum: 0
-          description: 样本 ID 到已确认结论版本的输入快照
     ReportEnvelope:
       type: object
       required:
-      - data
-      - meta
+        - data
+        - meta
       properties:
         data:
           $ref: '#/components/schemas/Report'

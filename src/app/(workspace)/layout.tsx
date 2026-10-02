@@ -3,6 +3,7 @@ import Link from "next/link";
 import { WorkspaceNavigation, MobileNavigation } from "@/components/workspace-navigation";
 import { requireViewer } from "@/server/auth/require-viewer";
 import { IdentitySwitcher } from "@/features/identity/identity-switcher";
+import { AssistantHost } from "@/features/assistant/assistant-host";
 export default async function WorkspaceLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   const viewer = await requireViewer();
   return <div className="workspace">
@@ -15,5 +16,7 @@ export default async function WorkspaceLayout({ children }: Readonly<{ children:
       </header>
       {children}
     </div>
+    {/* 先通过密码门禁才显示助手；工作台内换页保留面板，切换角色重新创建。 */}
+    <AssistantHost key={viewer.id} role={viewer.role} />
   </div>;
 }

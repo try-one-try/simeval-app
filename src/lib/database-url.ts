@@ -25,5 +25,7 @@ export function getMaintenanceDatabaseUrl(environment: Readonly<Record<string, s
 }
 
 export function databasePoolConfig(input: unknown, max = 5) {
-  return { connectionString: parseDatabaseUrl(input).connectionString, max, connectionTimeoutMillis: 10_000, idleTimeoutMillis: 10_000 };
+  // 看一会儿再切页时继续复用连接；原来空闲 10 秒便断开，容易反复等待远程握手。
+  // 最多仍为 5 条连接，空闲 1 分钟后释放，不会无限占用。
+  return { connectionString: parseDatabaseUrl(input).connectionString, max, connectionTimeoutMillis: 10_000, idleTimeoutMillis: 60_000 };
 }

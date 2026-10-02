@@ -10,6 +10,12 @@ export async function resetDemoData(db: PrismaClient) {
       throw new Error("恢复只允许专用 SimEval 演示库，不能包含其他项目或真实用户。");
     }
     // 先删除引用方，再删除父记录；任务自关联先解除，不使用 DROP／TRUNCATE CASCADE。
+    // 恢复会清理聊天，但保留累计费用账本，避免恢复演示数据变相补充 AI 额度。
+    if (await tx.assistantTurn.count({ where: { status: "RUNNING", deadlineAt: { gt: new Date() } } })) {
+      throw new Error("请先停止进行中的助手分析，再恢复演示库。");
+    }
+    await tx.assistantTurn.deleteMany();
+    await tx.assistantSession.deleteMany();
     await tx.accessAttempt.deleteMany();
     await tx.auditLog.deleteMany();
     await tx.aIReport.deleteMany();

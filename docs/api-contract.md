@@ -4,7 +4,7 @@
 
 ## 1. 可调用与待实施
 
-**2026-09-27，接口版本 0.6.0。** 质量／评测十项操作，加上比较、异常列表／详情、结论编辑共十四项已实现。报告待阶段 5 验收后重新讨论；指派／重开未实现。
+**2026-10-03，接口版本 0.8.0。** 原十四项加五项聊天、四项报告，共 23 项已实现；指派／重开两项保留 planned。阶段 8 本地手工验收与生产发布尚待完成。
 
 仅两个预设账号会话有效，旧 ADMIN 返回 401。工程师管理本人任务，评测人员只读任务；服务端拒绝越权写入。回补和人工分类退出当前产品，历史数据库关系保留。
 
@@ -13,7 +13,7 @@
 - **身份与写入**：校验 Session、预设账号 email／isDemo 和数据库角色；写入要求同源 Origin、Zod 与业务权限。POST／PATCH／DELETE 都校验 Origin。
 - **输入与分页**：ID 长 1–64，仅字母／数字／下划线／连字符；Body 拒绝多余字段。任务名 trim 后 1–120 字，Episode 1–10000，Seed 0–2147483647；目录另收紧 Episode。page 从 1，pageSize 默认 20／最多 100，任务按时间倒序＋ID 排序；异常按 sampleNumber＋ID 升序。
 - **响应**：成功 `{data,meta:{requestId}}`；错误 `{error:{code,message,fieldErrors,requestId}}`。fieldErrors 为字段消息数组映射或 null；不泄漏 SQL、密码或堆栈。
-- **幂等**：创建／重试／计划的报告生成带 1–128 字符 Idempotency-Key。同用户／操作／键及内容重复返回原对象；同键换内容 409。创建首次 201，重复 200。
+- **幂等**：创建／重试带 1–128 字符 Idempotency-Key；聊天改用正文 requestKey UUID，报告按来源轮次自动去重。同用户／操作／键及内容重复返回原对象；同键换内容 409。创建首次 201，重复 200。
 - **四个标识**：requestId 跟踪一次请求；runId 定位任务；幂等键识别重复动作；expectedVersion 防止编辑覆盖。
 
 ## 3. 当前状态与模拟逻辑
@@ -178,7 +178,7 @@ PATCH 返回完整详情，sample.version 是下一次编辑的 expectedVersion�
 
 草稿与最终内容分开；保存增加编辑 version，最终文本变化才增加 confirmedRevision。每次成功保存追加历史与审计，版本冲突 409 不写任何部分；界面保留输入，读取最新记录后人工核对再存。
 
-确认内容改变时，同事务标记引用此任务的旧报告 isStale；草稿及相同文本确认不会标记过时。此阶段只保护已有报告，尚未实现报告生成、确认或自动更新。网页首次比较沿用任务创建时的基线；用户选择“不对比”只改 URL，不改任务配置。
+确认内容改变时，同事务标记引用此任务的旧报告 isStale；草稿及相同文本确认不会标记过时。阶段 8 已接入新格式报告保存、读取与确认；历史报告不自动更新。网页首次比较沿用任务创建时的基线；用户选择“不对比”只改 URL，不改任务配置。
 
 ## 6. 变更记录
 
@@ -193,3 +193,39 @@ PATCH 返回完整详情，sample.version 是下一次编辑的 expectedVersion�
 | 2026-09-27 | 0.5.0 | 自主目录、可空基线、目标与结果摘要、三任务容量及软删除已实现；targetSuccessRate 为实际目标字段 |
 
 | 2026-09-27 | 0.6.0 | 比较、异常列表／详情和自由结论编辑已实现；补安全 DTO、草稿／确认版本、并发与旧报告过时契约 |
+
+## 阶段 8：聊天与报告
+
+这些 JSON 接口仍使用 data/meta.requestId，错误沿用 error.code/message/fieldErrors/requestId。所有接口要求新登录令牌中的 accessId，写操作检查 Origin。字段及逐行事件完整定义在 OpenAPI 0.8.0。
+
+| 方法与路径 | 请求 | 返回／约束 |
+|---|---|---|
+| GET /api/assistant/sessions | 无 | 当前登录最近 40 个 Session |
+| POST /api/assistant/sessions | runId、可空 baselineRunId | Session；只绑定成功任务；比较只对工程师开放；不调用模型 |
+| GET /api/assistant/sessions/{sessionId} | 路径 ID | session、最多 16 个 turns，历史来源变化时 stale=true |
+| POST /api/assistant/sessions/{sessionId}/messages | question 1–2000 字、requestKey UUID、可空 sampleId | application/x-ndjson；同键同内容不重跑，不同内容 409 |
+| POST /api/assistant/sessions/{sessionId}/turns/{turnId}/stop | 路径 ID，无正文 | stopped=true，尽力中止；不承诺退回已消费额度 |
+| GET /api/ai-reports | 必填 runId | 最新 30 个共享 Report |
+| POST /api/ai-reports | sessionId、turnId | 从自己的成功轮次保存模板报告，首次／重复均 200；不传报告文本或幂等头 |
+| GET /api/ai-reports/{reportId} | 路径 ID | Report；工程师和评测人员均可读 |
+| POST /api/ai-reports/{reportId}/confirm | 无正文 | REVIEWER 专用；来源变更返回 409 |
+
+创建会话示例：
+
+~~~json
+{"runId":"demo-run-candidate","baselineRunId":null}
+~~~
+
+发送正文示例（sampleId 只是上下文提示，不提供授权）：
+
+~~~json
+{"question":"概括本次评测的风险，并提供证据","requestKey":"b6443d71-607a-42bd-b83f-bce1773aa179","sampleId":null}
+~~~
+
+流中的每行是一个事件：start 带 turnId，trace 带工具状态，text 带 delta，done 带完整 turn；保存故障可能以 error 结束。客户端按换行读取，不能把整个响应当单个 JSON。HTTP 200 不代表分析成功，必须检查 done.turn.status；流开始前的认证／额度错误仍使用普通 HTTP 错误状态。
+
+Turn 含问题、答案、状态、工具记录、证据快照、model、用量、时间及 stale。Report 含 id/runId/status/isStale/createdAt/confirmedAt/model/output；output 是 version=1、title、summary、metrics、findings、limitations、sourceTurnId。报告不公开聊天文本或工程师专用比较内容。
+
+新增错误：RUN_IN_PROGRESS、CONTEXT_LIMIT、SOURCE_CHANGED、IDEMPOTENCY_CONFLICT（409）；RATE_LIMITED、BUDGET_EXHAUSTED（429）；MODEL_CONFIG／MODEL_UNAVAILABLE（503）；引用失败、模型错误、超时和中止在流终态体现。来源指纹包括草稿编辑版本，可能比原有最终结论失效标记更保守。
+
+| 2026-10-03 | 0.8.0 | 登录访问隔离、NDJSON 调查、有限运行和证据模板报告；报告旧 planned 请求由 sessionId/turnId 替代 |

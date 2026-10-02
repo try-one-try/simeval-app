@@ -2,6 +2,8 @@
 generator client {
   provider = "prisma-client"
   output   = "../src/generated/prisma"
+  // 把关联表尽量一次查齐，减少本机到远程数据库反复往返；不改变表结构。
+  previewFeatures = ["relationJoins"]
 }
 
 datasource db {
@@ -80,6 +82,7 @@ model User {
   requestedReports  AIReport[]      @relation("ReportRequester")
   confirmedReports  AIReport[]      @relation("ReportConfirmer")
   audits            AuditLog[]      @relation("AuditActor")
+  assistantSessions AssistantSession[]
 }
 
 // 只保存请求来源的摘要和失败次数，不保存原始 IP 或访问密码。
@@ -214,6 +217,8 @@ model EvaluationRun {
   anomalies             AnomalySample[]
   reports               AIReport[]      @relation("ReportRun")
   baselineReports       AIReport[]      @relation("ReportBaseline")
+  assistantSessions     AssistantSession[] @relation("AssistantRun")
+  assistantBaselines    AssistantSession[] @relation("AssistantBaseline")
 
   @@unique([createdById, idempotencyKey])
   @@index([projectId, status, createdAt])
@@ -344,4 +349,60 @@ model AuditLog {
   actor      User     @relation("AuditActor", fields: [actorId], references: [id])
 
   @@index([entityType, entityId, createdAt])
+}
+
+// 登录标识区分使用同一演示账号的访客；聊天只在当前登录内可恢复。
+model AssistantSession {
+  id            String @id @default(cuid()) @db.VarChar(64)
+  ownerId       String @db.VarChar(64)
+  accessId      String @db.VarChar(64)
+  runId         String @db.VarChar(64)
+  baselineRunId String? @db.VarChar(64)
+  title         String @db.VarChar(120)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  owner         User @relation(fields: [ownerId], references: [id])
+  run           EvaluationRun @relation("AssistantRun", fields: [runId], references: [id])
+  baseline      EvaluationRun? @relation("AssistantBaseline", fields: [baselineRunId], references: [id])
+  turns         AssistantTurn[]
+
+  @@index([accessId, ownerId, updatedAt])
+}
+
+// 保存完整轮次；进程中断后用 deadlineAt 识别未收尾的运行。
+model AssistantTurn {
+  id             String @id @default(cuid()) @db.VarChar(64)
+  sessionId      String @db.VarChar(64)
+  requestKey     String @db.VarChar(128)
+  question       String @db.Text
+  status         String @db.VarChar(24)
+  answer         String? @db.Text
+  messages       Json?
+  evidence       Json?
+  traces         Json?
+  sourceSnapshot Json?
+  errorCode      String? @db.VarChar(80)
+  errorMessage   String? @db.Text
+  model          String @db.VarChar(80)
+  promptVersion  String @db.VarChar(40)
+  inputTokens    Int?
+  outputTokens   Int?
+  modelCalls     Int @default(0)
+  reservedMicros Int
+  chargedMicros  Int?
+  budgetKey      String @db.VarChar(80)
+  createdAt      DateTime @default(now())
+  deadlineAt     DateTime
+  finishedAt     DateTime?
+  session        AssistantSession @relation(fields: [sessionId], references: [id])
+
+  @@unique([sessionId, requestKey])
+  @@index([status, deadlineAt])
+}
+
+// 金额单位是百万分之一美元；并发请求在事务中锁定同一行后预留额度。
+model AssistantBudget {
+  key            String @id @db.VarChar(80)
+  committedMicros Int @default(0)
+  updatedAt      DateTime @updatedAt
 }

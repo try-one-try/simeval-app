@@ -14,6 +14,8 @@ import { WorkspaceNotice } from "@/components/workspace-notice";
 import { TASK_SELECTION_PAGE_SIZE } from "@/lib/evaluation-dto";
 import { TaskFlowBackLink } from "./task-flow-back-link";
 import { evidenceHref, resultsHref, type EvidenceContext } from "@/lib/review-links";
+import { reportService } from "@/server/application/report";
+import { ReportList } from "@/features/assistant/report-list";
 const names = { evaluations: "评测任务", comparisons: "模型对比", anomalies: "异常复核", reports: "报告", overview: "总览" };
 export type ModuleParams = Promise<Record<string, string | string[] | undefined>>;
 export async function ModuleEntry({ module, searchParams }: { module: TaskModule; searchParams: ModuleParams }) {
@@ -51,7 +53,7 @@ export async function ModuleEntry({ module, searchParams }: { module: TaskModule
   return <main className="content workflow-content selected-module-view">
     <RunContext run={run} href={"/" + module} /><div className="page-context task-flow-header"><TaskFlowBackLink href={module === "reports" ? evidenceHref(run.id,reportContext) : resultsHref(run.id)} label={module === "reports" ? "返回异常复核" : run.status === "SUCCEEDED" ? "返回评测结果" : "返回任务状态"}/><span>{names[module]} / 当前任务</span></div>
     <div className="overview-heading"><div><h1>{module === "overview" ? "本次评测总览" : names[module]}</h1><p className="muted">{run.modelName} {run.modelVersion} · {run.datasetName} {run.datasetVersion} · {run.status}</p></div></div>
-    {module === "overview" ? <><RunResults run={run} /><dl className="task-facts"><div><dt>Benchmark</dt><dd>{run.benchmarkName} {run.benchmarkVersion}</dd></div><div><dt>运行口径</dt><dd>{run.episodeCount} Episodes · Seed {run.simulationSeed}</dd></div><div><dt>历史基线</dt><dd>{run.baselineRunId ? "已指定比较对象" : "未指定；可独立执行"}</dd></div></dl><p className="quality-caption muted">{run.successRule}</p></> : <><p className="muted">报告功能正在规划，生成与确认暂未开放。当前已保留所选任务，尚未开放的操作不会生成结果。</p>{run.pendingReviewCount > 0 && <p className="pending-review"><strong>{run.pendingReviewCount} 条待复核</strong><span>需评测人员复核</span></p>}</>}
+    {module === "overview" ? <><RunResults run={run} /><dl className="task-facts"><div><dt>Benchmark</dt><dd>{run.benchmarkName} {run.benchmarkVersion}</dd></div><div><dt>运行口径</dt><dd>{run.episodeCount} Episodes · Seed {run.simulationSeed}</dd></div><div><dt>历史基线</dt><dd>{run.baselineRunId ? "已指定比较对象" : "未指定；可独立执行"}</dd></div></dl><p className="quality-caption muted">{run.successRule}</p></> : <ReportList key={run.id + (typeof params.reportId === "string" ? params.reportId : "")} initial={await reportService.list(viewer, run.id)} role={viewer.role} selectedId={typeof params.reportId === "string" ? params.reportId : undefined} />}
     <div className="workflow-actions"><Link className="primary-button" href={module === "reports" ? evidenceHref(run.id,reportContext) : run.status === "SUCCEEDED" ? (viewer.role === "ENGINEER" ? "/comparisons" : "/anomalies") + "?runId=" + run.id : resultsHref(run.id)}>{module === "reports" ? "← 返回异常复核" : run.status === "SUCCEEDED" ? viewer.role === "ENGINEER" ? "查看模型对比 →" : "查看异常复核 →" : "查看当前任务 →"}</Link>{module === "reports" && <><Link className="text-action" href={resultsHref(run.id,reportContext.baselineRunId)}>查看评测结果 ↗</Link><Link className="text-action" href={"/overview?runId=" + run.id}>查看本次总览 ↗</Link></>}{viewer.role === "ENGINEER" && <Link className="text-action" href="/evaluations/new">创建新评测 ＋</Link>}</div>
     <p className="fine-print">合成数据 · 模拟执行 · 不代表真实模型表现</p>
   </main>;

@@ -1,6 +1,6 @@
 # SimEval 架构设计
 
-**2026-09-27：双身份、自主配置、两步质量确认、独立模拟、多任务与软删除已接通。** 阶段 5 已接入比较、证据与结论编辑；报告待重新讨论。行为看[规格](../specs/002-quality-evaluation/spec.md)，规则矩阵与算法看[计划](../specs/002-quality-evaluation/plan.md)，比较与复核看[003规格](../specs/003-comparison-review/spec.md)，HTTP 看 [OpenAPI](openapi.yaml)。
+**2026-09-27：双身份、自主配置、两步质量确认、独立模拟、多任务与软删除已接通。** 阶段 5 已接入比较、证据与结论编辑。2026-10-03 新增 LangChain 评测助手及报告，本地手工验收待完成。行为看[规格](../specs/002-quality-evaluation/spec.md)，规则矩阵与算法看[计划](../specs/002-quality-evaluation/plan.md)，比较与复核看[003规格](../specs/003-comparison-review/spec.md)，HTTP 看 [OpenAPI](openapi.yaml)。
 
 ## 1. 运行边界
 
@@ -37,7 +37,15 @@ flowchart LR
 
 登录／切换走 Server Action：访客选择身份并输入访问密码 → Credentials 在服务端核对 `ACCESS_PASSWORD` 和预设账号 → Auth.js 签发带授权时间的 JWT Cookie → 角色默认页。相同来源 15 分钟内输错 5 次暂停 15 分钟；数据库只保存来源摘要和失败窗口。会话最多 12 小时；旧令牌没有授权时间会失效。页面与 HTTP 每次用会话 userId 重新查数据库；历史 ADMIN 或不匹配账号视为失效。切换前先核对当前会话，再由服务端重建目标身份会话，不要求访客重输密码。
 
-首屏由 Server Component 直接调用应用服务；业务交互通过 HTTP。当前 Mock 在事务内只做本地纯计算；未来外部执行与 AI 网络请求放到事务外，校验结果后用短事务保存。
+首屏由 Server Component 直接调用应用服务；业务交互通过 HTTP。当前 Mock 在事务内只做本地纯计算；AI 网络请求已放在事务外，未来外部执行也须如此，校验结果后用短事务保存。
+
+### 页面读取与连接复用
+
+- 页面布局和正文通过 React `cache` 共用本次请求的身份读取。缓存不跨请求、不跨访客，换页及 HTTP 写入仍重新校验权限。
+- Prisma 7 开启 `relationJoins`，关联读取默认由数据库合并返回，减少远程往返。目前是 Prisma 的预览特性，升级依赖时需复查；必要时可对个别查询指定 `relationLoadStrategy: "query"`。它只改变查询方式，不需要数据库迁移。机制见 [Prisma 关联查询文档](https://docs.prisma.io/docs/orm/v7/prisma-client/queries/relation-queries)。
+- 每个进程最多 5 条连接，空闲 60 秒释放，连接等待上限 10 秒。修改连接配置或重新生成 Prisma Client 后，应重启本地开发服务，避免继续复用旧实例。
+- 助手收起时停止随页面切换读取任务，重新展开才核对当前任务；聊天归属和正在执行的调查不受影响。
+- 本机开发服务到远程数据库仍有网络耗时。开发模式编译、首次建连和业务查询分别计时；查询变快不能直接等同于整页加载达标。
 
 ## 3. 新产品怎样映射到工程
 
@@ -63,7 +71,7 @@ flowchart LR
 | 模型／数据／Benchmark 目录 | 兼容矩阵与命名统一在 domain/evaluation-catalog.ts；catalog.ts 补目录后调用 demo-fixtures.ts，完整 Seed／db:catalog 共用，保留已有结果、人工内容和删除状态 |
 | AnomalySample | 已分开 draftConclusion 与已确认 conclusion，保存修改人／时间、confirmedById／confirmedAt 和 confirmedRevision；现有 version 用于所有编辑防覆盖 |
 | ReviewRecord | 只追加每次草稿／确认／修改的内容、操作者、时间与来源版本，不要求人工分类 |
-| AIReport | 输入快照保存指标、证据和 sourceReviewVersions（样本 ID → 确认版本）；已加 isStale／staleAt；生成与确认尚未实现。过时报告保留原确认历史，当前入口提示重生成 |
+| AIReport | 复用已有表保存当前任务证据模板；来源 hash 包含任务、指标和样本编辑版本。支持读取、保存、人工确认；过时报告保留历史，拒绝确认 |
 
 草稿保存只增加编辑 version；最终结论内容改变才增加 confirmedRevision 并令旧报告过时。报告确认时再次核对来源版本，避免“生成时有效、确认时已过期”。
 
@@ -90,3 +98,13 @@ comparison-view / anomaly-list / sample-detail / review-editor → HTTP 统一�
 复核先锁 EvaluationRun，复查成功／未隐藏及权限；再检查 AnomalySample.version 并条件更新。当前内容、ReviewRecord、旧报告过时标记、AuditLog 同事务提交。两个请求拿同一版本时一个成功、另一个 409；前端保留后者输入。任务删除也锁同一任务，防止隐藏后继续写复核。
 
 确认修订号只追踪最终文本变化；编辑版本追踪全部保存。已有 RESOLVED 故事在迁移中补确认修订 1 及历史确认人，旧内容和旧分类／回补关系保留。完整 Seed 初始化新环境时重建固定示例确认字段；本轮开发库只追加迁移，没有重跑完整 Seed。
+
+## 6. 评测调查 Agent
+
+新增 AssistantSession、AssistantTurn、AssistantBudget；共享业务账号之上，以服务端每次登录生成的 accessId 隔离私人聊天。每个接口从认证令牌读取访问标识，不接受客户端自报。公开页无助手，工作台按需加载聊天依赖。
+
+LocalRuntime → 本站 NDJSON → assistant 应用服务 → LangChain createAgent → 四个只读业务工具 → 既有应用服务和仓储。模型不能选择账号、执行任意 SQL 或修改业务数据。工具结果带证据 ID、数据快照与时间，引用验证后才能保存为有效分析。
+
+数据库保存历史，但模型仅接收近期三轮成功问答；不是长期记忆。模型前预留费用，完整用量返回后结算差额；状态条件更新避免取消后被成功覆盖。固定模板生成报告，无二次模型调用；共享报告只包含当前任务的指标和人工结论。
+
+详细文件、运行限制与取舍见 [006 实施计划](../specs/006-evaluation-agent/plan.md)。
