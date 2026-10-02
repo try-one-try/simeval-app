@@ -1,0 +1,250 @@
+{
+  "cell": {
+    "width": 1112,
+    "height": 834
+  },
+  "columns": 2,
+  "rows": 2,
+  "frames": 56,
+  "sheetsPerDirection": 14,
+  "quality": 0.9,
+  "labels": {
+    "left": "扶镜",
+    "right": "伸手",
+    "up": "抬头",
+    "down": "低头"
+  },
+  "pattern": "/avatar/v1/{direction}-{sheet}.webp",
+  "poster": "/avatar/v1/idle.webp",
+  "assets": [
+    {
+      "file": "down-0.webp",
+      "bytes": 209090
+    },
+    {
+      "file": "down-1.webp",
+      "bytes": 203540
+    },
+    {
+      "file": "down-10.webp",
+      "bytes": 196082
+    },
+    {
+      "file": "down-11.webp",
+      "bytes": 204310
+    },
+    {
+      "file": "down-12.webp",
+      "bytes": 205320
+    },
+    {
+      "file": "down-13.webp",
+      "bytes": 209830
+    },
+    {
+      "file": "down-2.webp",
+      "bytes": 196046
+    },
+    {
+      "file": "down-3.webp",
+      "bytes": 196588
+    },
+    {
+      "file": "down-4.webp",
+      "bytes": 185914
+    },
+    {
+      "file": "down-5.webp",
+      "bytes": 184976
+    },
+    {
+      "file": "down-6.webp",
+      "bytes": 186838
+    },
+    {
+      "file": "down-7.webp",
+      "bytes": 189054
+    },
+    {
+      "file": "down-8.webp",
+      "bytes": 190808
+    },
+    {
+      "file": "down-9.webp",
+      "bytes": 195438
+    },
+    {
+      "file": "idle.webp",
+      "bytes": 58580
+    },
+    {
+      "file": "left-0.webp",
+      "bytes": 223888
+    },
+    {
+      "file": "left-1.webp",
+      "bytes": 212800
+    },
+    {
+      "file": "left-10.webp",
+      "bytes": 235340
+    },
+    {
+      "file": "left-11.webp",
+      "bytes": 235740
+    },
+    {
+      "file": "left-12.webp",
+      "bytes": 235032
+    },
+    {
+      "file": "left-13.webp",
+      "bytes": 243622
+    },
+    {
+      "file": "left-2.webp",
+      "bytes": 213914
+    },
+    {
+      "file": "left-3.webp",
+      "bytes": 209280
+    },
+    {
+      "file": "left-4.webp",
+      "bytes": 206254
+    },
+    {
+      "file": "left-5.webp",
+      "bytes": 210608
+    },
+    {
+      "file": "left-6.webp",
+      "bytes": 220600
+    },
+    {
+      "file": "left-7.webp",
+      "bytes": 220134
+    },
+    {
+      "file": "left-8.webp",
+      "bytes": 232412
+    },
+    {
+      "file": "left-9.webp",
+      "bytes": 233510
+    },
+    {
+      "file": "right-0.webp",
+      "bytes": 213178
+    },
+    {
+      "file": "right-1.webp",
+      "bytes": 199610
+    },
+    {
+      "file": "right-10.webp",
+      "bytes": 213854
+    },
+    {
+      "file": "right-11.webp",
+      "bytes": 218894
+    },
+    {
+      "file": "right-12.webp",
+      "bytes": 221976
+    },
+    {
+      "file": "right-13.webp",
+      "bytes": 224932
+    },
+    {
+      "file": "right-2.webp",
+      "bytes": 192650
+    },
+    {
+      "file": "right-3.webp",
+      "bytes": 196668
+    },
+    {
+      "file": "right-4.webp",
+      "bytes": 200990
+    },
+    {
+      "file": "right-5.webp",
+      "bytes": 198732
+    },
+    {
+      "file": "right-6.webp",
+      "bytes": 208164
+    },
+    {
+      "file": "right-7.webp",
+      "bytes": 204508
+    },
+    {
+      "file": "right-8.webp",
+      "bytes": 203458
+    },
+    {
+      "file": "right-9.webp",
+      "bytes": 203674
+    },
+    {
+      "file": "up-0.webp",
+      "bytes": 201632
+    },
+    {
+      "file": "up-1.webp",
+      "bytes": 187106
+    },
+    {
+      "file": "up-10.webp",
+      "bytes": 168754
+    },
+    {
+      "file": "up-11.webp",
+      "bytes": 169576
+    },
+    {
+      "file": "up-12.webp",
+      "bytes": 174334
+    },
+    {
+      "file": "up-13.webp",
+      "bytes": 183446
+    },
+    {
+      "file": "up-2.webp",
+      "bytes": 181364
+    },
+    {
+      "file": "up-3.webp",
+      "bytes": 180610
+    },
+    {
+      "file": "up-4.webp",
+      "bytes": 174208
+    },
+    {
+      "file": "up-5.webp",
+      "bytes": 167470
+    },
+    {
+      "file": "up-6.webp",
+      "bytes": 166472
+    },
+    {
+      "file": "up-7.webp",
+      "bytes": 168230
+    },
+    {
+      "file": "up-8.webp",
+      "bytes": 169122
+    },
+    {
+      "file": "up-9.webp",
+      "bytes": 169686
+    }
+  ],
+  "totalBytes": 11308846
+}

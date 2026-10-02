@@ -4,7 +4,7 @@
 
 ## 产品与真实状态
 
-**当前阶段 3–5 的核心业务已实现，阶段 6 的部署版本已上线；主页与 AI 报告仍待完善。** 目标流程是：
+**当前阶段 3–5 的核心业务已实现，阶段 6 的部署版本已上线；交互主页已接入工程并完成本地技术验证，待发布，AI 报告仍待实现。** 目标流程是：
 
 选择模型／数据／Benchmark → 确认质量 → 创建并模拟执行 → 查看结果／按需比较基线 → 异常复核 → 生成并确认报告。
 
@@ -24,6 +24,7 @@
 |---|---|
 | 产品与技术文档 | [PRD](docs/PRD.md)、[技术架构与 API](docs/架构与接口.md) |
 | 开发过程 | [项目开发流程](docs/开发流程.md)，阶段交付、验证证据、技术取舍与待完成项 |
+| 交互主页 | [规格](specs/005-homepage/spec.md)、[内容修改与验收](specs/005-homepage/quickstart.md)；文案和外链集中在 `src/features/home/content.ts` |
 | 产品与交互 | [Figma 现行工程页](https://www.figma.com/design/Y2ZIhN1yuuXBeieGkxtnsH/simeval?node-id=371-484)；访问密码登录参考[设计画框](https://www.figma.com/design/Y2ZIhN1yuuXBeieGkxtnsH/simeval?node-id=197-476) |
 | 评测与任务规格 | [需求](specs/002-quality-evaluation/spec.md) → [计划](specs/002-quality-evaluation/plan.md) → [任务](specs/002-quality-evaluation/tasks.md) → [验收](specs/002-quality-evaluation/quickstart.md) |
 | 比较与复核规格 | [需求](specs/003-comparison-review/spec.md) → [计划](specs/003-comparison-review/plan.md) → [任务](specs/003-comparison-review/tasks.md) → [验收](specs/003-comparison-review/quickstart.md) |
