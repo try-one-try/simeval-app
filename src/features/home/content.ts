@@ -23,9 +23,9 @@ export const homeContent = {
     label: "BEHIND THE BUILD",
     title: "设计->开发->部署",
     items: [
-      { number: "01", title: "产品需求 PRD", description: "从用户问题出发，定义范围与验收标准。", href: `${docs}/PRD.md`, tag: "PRODUCT" },
+      { number: "01", title: "产品需求 PRD", description: "从问题出发，定义范围与验收标准。", href: `${docs}/PRD.md`, tag: "PRODUCT" },
       { number: "02", title: "架构与接口设计", description: "模块边界、数据关系与完整 API 契约。", href: `${docs}/${encodeURIComponent("架构与接口.md")}`, tag: "ENGINEERING" },
-      { number: "03", title: "产品原型设计", description: "黑白克制表达，由简入繁、分层呈现。", href: prototype, tag: "FIGMA" },
+      { number: "03", title: "产品原型设计", description: "使用Figma设计，黑白色调，由简入繁、分层呈现。", href: prototype, tag: "FIGMA" },
     ],
     // 一处讲清方法、展示本项目产物，再给出工具来源；两个链接按阅读顺序排列。
     principle: {

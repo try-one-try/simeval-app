@@ -1,5 +1,6 @@
 // 全站根布局：集中设置页面元信息、中文语义和全局样式。
 import type { Metadata } from "next";
+import { AssistantHost } from "@/features/assistant/assistant-host";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -10,7 +11,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="zh-CN">
-      <body>{children}</body>
+      <body>{children}<AssistantHost /></body>
     </html>
   );
 }
