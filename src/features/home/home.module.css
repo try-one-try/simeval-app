@@ -67,8 +67,6 @@
 .frame [hidden] { display:none; }
 .frame:focus-visible { border-radius:8px; outline-color:#aaa; }
 .portraitHint { margin-top:25px; color:#777; font-size:12px; }
-.touchHint { display:none; }
-@media(pointer:coarse) { .mouseHint { display:none; } .touchHint { display:inline; } }
 .staticRetry { display:block; margin:8px auto 0; min-height:32px; background:transparent; color:#555; font-size:11px; text-decoration:underline; text-underline-offset:3px; }
 .footer { margin-top:58px; padding:26px 0 22px; border-top:1px solid var(--home-line); }
 .footerTop { display:flex; align-items:center; justify-content:space-between; gap:20px; font-size:12px; }

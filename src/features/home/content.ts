@@ -53,7 +53,6 @@ export const homeContent = {
   },
   portrait: {
     hint: "上下左右移动鼠标探索",
-    touchHint: "在人物上，向上下左右拖动探索",
   },
   footer: {
     // 底部只保留技术栈与演示边界；项目源码已经放在顶部导航。

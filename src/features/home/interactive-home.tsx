@@ -140,7 +140,7 @@ export function InteractiveHome({ header, introduction, left, right, footer }: P
               <img ref={poster} src={`${AVATAR_BASE}/idle.webp`} width={1112} height={834} alt="穿浅蓝衬衫、戴黑色墨镜的项目创作者，双手轻放胸前。" fetchPriority="high" draggable={false} />
               <canvas ref={canvas} width={1112} height={834} hidden aria-hidden="true" data-frame="idle" />
             </div>
-            <p className={styles.portraitHint}><span className={styles.mouseHint}>{homeContent.portrait.hint}</span><span className={styles.touchHint}>{homeContent.portrait.touchHint}</span></p>
+            <p className={styles.portraitHint}>{homeContent.portrait.hint}</p>
             {status === "static" && <button className={styles.staticRetry} onClick={retry}>重新加载互动 ↻</button>}
           </section>
           {right}

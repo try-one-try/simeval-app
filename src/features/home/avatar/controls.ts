@@ -85,11 +85,12 @@ export function pointerTarget(x: number, y: number, width: number, height: numbe
 export const TOUCH_SETTINGS = {
   // 手指先走 8px 才开始动，避免轻点人物时因为手抖误触。
   deadZone: 8,
-  // 开始动后，再拖动人物区域宽度的 24% 就完成动作。调小，手指挪得更短。
-  travel: 0.24,
-  // 上面的距离限制在 56～96px，手机和平板都不需要拖太远。
-  minTravel: 56,
-  maxTravel: 96,
+  // 开始动后，再拖动人物区域宽度的 48% 就完成动作。调大，手指要拖得更远，人物更不敏感。
+  travel: 0.48,
+  // 距离限制在 112～192px；这两个值和 travel 一起增大，才不会被距离上限抵消。
+  // 现在完成动作的拖动距离是上一版的两倍；同样拖一小段，动作进度约为原来的一半。
+  minTravel: 112,
+  maxTravel: 192,
   // 斜着拖时，另一方向明显多出 15% 才换方向，避免左右／上下反复抢动作。
   directionHysteresis: 0.15,
 } as const;
