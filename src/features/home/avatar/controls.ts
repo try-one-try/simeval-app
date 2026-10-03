@@ -79,6 +79,40 @@ export function pointerTarget(x: number, y: number, width: number, height: numbe
   return { direction: dx < 0 ? "left" : "right", amount: clamp((Math.abs(dx) - settings.horizontalDeadZone) / settings.horizontalTravel, 0, 1) };
 }
 
+/** 手机手感单独调整，不影响上面的鼠标参数。
+ * 手指按下的位置就是起点：往哪边拖，人物就做哪边的动作，不要求手指碰到屏幕边缘。
+ */
+export const TOUCH_SETTINGS = {
+  // 手指先走 8px 才开始动，避免轻点人物时因为手抖误触。
+  deadZone: 8,
+  // 开始动后，再拖动人物区域宽度的 24% 就完成动作。调小，手指挪得更短。
+  travel: 0.24,
+  // 上面的距离限制在 56～96px，手机和平板都不需要拖太远。
+  minTravel: 56,
+  maxTravel: 96,
+  // 斜着拖时，另一方向明显多出 15% 才换方向，避免左右／上下反复抢动作。
+  directionHysteresis: 0.15,
+} as const;
+
+export function touchTarget(dx: number, dy: number, width: number, previous: Direction | null): Target {
+  const settings = TOUCH_SETTINGS;
+  const horizontal = Math.abs(dx), vertical = Math.abs(dy);
+  if (Math.max(horizontal, vertical) <= settings.deadZone) return { direction: null, amount: 0 };
+
+  let useVertical = vertical >= horizontal;
+  if (previous === "up" || previous === "down") {
+    useVertical = horizontal <= vertical * (1 + settings.directionHysteresis);
+  } else if (previous === "left" || previous === "right") {
+    useVertical = vertical > horizontal * (1 + settings.directionHysteresis);
+  }
+  const distance = useVertical ? vertical : horizontal;
+  const travel = clamp(width * settings.travel, settings.minTravel, settings.maxTravel);
+  return {
+    direction: useVertical ? (dy < 0 ? "up" : "down") : (dx < 0 ? "left" : "right"),
+    amount: clamp((distance - settings.deadZone) / travel, 0, 1),
+  };
+}
+
 /** 下面才是人物运动速度。上面的参数只管“鼠标走多远，动作做多少”。
  * 人物会沿着视频慢慢做到指定动作；换方向时，先自然收手，再做新动作。
  * 为了保留已调好的流畅效果，日常调手感不用改这里。
