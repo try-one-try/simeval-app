@@ -17,3 +17,5 @@ AIReport 只加 isStale／staleAt，最终改变后保守标记关联候选或�
 比较查询必填 candidateRunId、可选 baselineRunId／scenarioKey，输出当前指标、可比差值、基线选项与证据数量。异常查询必填 runId，可按 metricKey、scenarioKey、status、reviewState、page／pageSize 筛选；详情可附 runId 核对归属。PATCH review 接受 conclusion、mode=draft|confirm、expectedVersion。
 增量目录以稳定 ID／upsert 只补两个历史模型与成功任务、每任务四指标；不覆盖已有记录，不重跑开发库完整 Seed。完成页按角色继续当前任务；等待／执行使用不确定进度条和已用时间，不伪造百分比，正常流程无刷新按钮，同步出错时提供重新连接；取消紧邻进度。复核示例只根据当前日志填表，不写库。
 工程师的对比页保留显式基线与上下文；评测人员直访对比仍拒绝。复核界面显示草稿和最终两个区块；两身份都有明显编辑入口，评测人员才能最终确认。
+
+2026-10-04：入口文案统一为“编辑/复核结论”，详情保留主按钮和 `review-workspace` 独立复核区域；区域 ID 为 `review-conclusion`，异常列表状态链接携带该锚点，详情状态链接定位本页区域，保留基线和筛选。入口后续按负责人反馈收敛：删除 `review-guide` 的“下一步”提示框，结果／比较不展示独立待复核跳转条，任务选择页的待复核数量恢复为普通红字；可点击状态仅保留在异常列表和详情。原生单选与原有异常主入口保持可用。仅调整展示和导航，无 Schema 或 HTTP 变更；按负责人约定不运行测试。

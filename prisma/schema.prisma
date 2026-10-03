@@ -315,6 +315,8 @@ model BackfillTask {
 model AIReport {
   id             String         @id @default(cuid()) @db.VarChar(64)
   runId          String         @db.VarChar(64)
+  // 当前报告填任务 ID，旧记录留空；唯一约束保证每个任务只显示一份。
+  currentForRunId String?        @unique @db.VarChar(64)
   baselineRunId  String?        @db.VarChar(64)
   status         ReportStatus
   isStale        Boolean        @default(false)
@@ -329,6 +331,7 @@ model AIReport {
   idempotencyKey String?        @db.VarChar(128)
   errorMessage   String?        @db.Text
   createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @default(now()) @updatedAt
   run            EvaluationRun  @relation("ReportRun", fields: [runId], references: [id])
   baselineRun    EvaluationRun? @relation("ReportBaseline", fields: [baselineRunId], references: [id])
   requestedBy    User           @relation("ReportRequester", fields: [requestedById], references: [id])

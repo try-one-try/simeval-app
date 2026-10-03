@@ -48,7 +48,7 @@ export function investigationTools(args: {
       return JSON.stringify({ error: message, evidenceId: null });
     }
   }
-  const summary = tool(async () => read("getEvaluationSummary", "读取评测概况", {}, "summary", `/overview?runId=${args.runId}`, async () => {
+  const summary = tool(async () => read("getEvaluationSummary", "读取评测概况", {}, "summary", `/evaluations/${encodeURIComponent(args.runId)}`, async () => {
     const run = await evaluationService.get(args.actor, args.runId);
     return { data: { id: run.id, name: run.name, model: `${run.modelName} ${run.modelVersion}`, dataset: `${run.datasetName} ${run.datasetVersion}`, benchmark: run.benchmarkName,
       episodes: run.episodeCount, targetSuccessRate: run.targetSuccessRate, successRule: run.successRule, status: run.status, metrics: run.metrics.slice(0, 24), anomalyCount: run.anomalyCount, pendingReviewCount: run.pendingReviewCount },

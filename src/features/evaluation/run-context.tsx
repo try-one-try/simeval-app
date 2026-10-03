@@ -9,6 +9,5 @@ export function RunResults({ run }: { run: RunData }) {
   return <>
     {run.status === "SUCCEEDED" && <><div className="result-metrics">{run.metrics.map(metric => <div key={metric.key + metric.scenarioKey}><p className="eyebrow">{metric.name}{metric.scenarioKey !== "__overall__" ? " · 遮挡场景" : ""}</p><strong>{metric.value}{metric.unit}</strong><p className="fine-print">{metric.sampleCount} 个 Episode</p></div>)}</div>
       <p className="goal-result">{run.targetSuccessRate === null ? "未设置达标目标；这些指标不代表发布结论。" : success ? (success.value >= run.targetSuccessRate * 100 ? "达到" : "未达到") + "本次成功率目标 " + run.targetSuccessRate * 100 + "%；仍需核对碰撞风险与异常证据。" : "成功率指标缺失，无法判断达标。"}</p></>}
-    {run.pendingReviewCount > 0 && <p className="pending-review"><strong>{run.pendingReviewCount} 条待复核</strong><span>需评测人员复核</span></p>}
   </>;
 }

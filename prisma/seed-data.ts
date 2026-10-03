@@ -2,13 +2,14 @@
 import type { Prisma } from "../src/generated/prisma/client";
 import { seedCatalogData } from "./catalog";
 import { MODEL_FAMILY_NAME, DEMO_RUN_NAMES, datasets } from "../src/domain/evaluation-catalog";
+import { demoIdentities } from "../src/lib/demo-identity";
 
 const at = (hour: number, minute = 0) => new Date(Date.UTC(2026, 8, 1, hour, minute));
 
 async function seedUsers(db: Prisma.TransactionClient) {
   const accounts = [
-    { id: "demo-user-engineer", email: "engineer@demo.simeval.local", name: "林工", role: "ENGINEER" as const },
-    { id: "demo-user-reviewer", email: "reviewer@demo.simeval.local", name: "陈复核", role: "REVIEWER" as const },
+    { id: "demo-user-engineer", email: demoIdentities.ENGINEER.email, name: demoIdentities.ENGINEER.label, role: "ENGINEER" as const },
+    { id: "demo-user-reviewer", email: demoIdentities.REVIEWER.email, name: demoIdentities.REVIEWER.label, role: "REVIEWER" as const },
     { id: "demo-user-admin", email: "admin@demo.simeval.local", name: "周管理员", role: "ADMIN" as const },
   ];
 

@@ -1,29 +1,21 @@
 // 会话归属、请求去重、预算和终态统一落库；模型网络请求从不放在事务里。
 import "server-only";
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
 import { getDb } from "@/server/db";
 import { AppError } from "@/domain/evaluation";
 import { evidenceSchema, traceSchema, type AssistantActor, type SessionView, type TurnView } from "@/domain/assistant";
 import { agentConfig, agentLimits, promptVersion } from "@/server/agent/config";
 import { z } from "zod";
+import { jsonValue, sourceSnapshot, snapshotHash } from "./evaluation-snapshot";
+export { jsonValue, sourceSnapshot, snapshotHash } from "./evaluation-snapshot";
 
-export const jsonValue = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 type Db = Prisma.TransactionClient;
 const includeSession = { run: { select: { name: true, deletedAt: true, status: true } }, baseline: { select: { name: true } } } as const;
 type SessionRecord = Prisma.AssistantSessionGetPayload<{ include: typeof includeSession }>;
 export function sessionView(s: SessionRecord): SessionView {
   return { id: s.id, title: s.title, runId: s.runId, runName: s.run.name || s.runId, baselineRunId: s.baselineRunId, baselineName: s.baseline?.name || null, updatedAt: s.updatedAt.toISOString() };
 }
-export async function sourceSnapshot(db: Db, runId: string, baselineRunId: string | null) {
-  const runs = await db.evaluationRun.findMany({ where: { id: { in: [runId, ...(baselineRunId ? [baselineRunId] : [])] } }, orderBy: { id: "asc" },
-    select: { id: true, status: true, deletedAt: true, resultsGeneratedAt: true,
-      metricResults: { orderBy: { id: "asc" }, select: { id: true, value: true, sampleCount: true } },
-      anomalies: { orderBy: { id: "asc" }, select: { id: true, version: true, confirmedRevision: true, status: true } },
-    } });
-  return { hash: createHash("sha256").update(JSON.stringify(runs)).digest("hex"), runId, baselineRunId };
-}
-export function snapshotHash(value: unknown) { return z.object({ hash: z.string() }).safeParse(value).data?.hash; }
 export async function ownedSession(actor: AssistantActor, id: string, db: Db = getDb()) {
   const session = await db.assistantSession.findFirst({ where: { id, ownerId: actor.id, accessId: actor.accessId }, include: includeSession });
   if (!session) throw new AppError("NOT_FOUND", "对话不存在或不属于当前登录", 404);

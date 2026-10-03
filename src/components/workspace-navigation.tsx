@@ -10,7 +10,7 @@ import { isCurrentItem, workspaceItems } from "@/lib/workspace-navigation";
 function NavigationItems({ role }: { role: DemoRole }) {
   const pathname = usePathname();
   return <nav aria-label="工作台导航" className="nav-list">{workspaceItems(role).map((item) =>
-    <Link key={item.href} href={item.href} className={"nav-item" + (item.href === "/overview" ? " nav-overview" : "")} aria-current={isCurrentItem(pathname, item.href) ? "page" : undefined}>
+    <Link key={item.href} href={item.href} className="nav-item" aria-current={isCurrentItem(pathname, item.href) ? "page" : undefined}>
       <span className="nav-name">{item.label}<span className="nav-arrow" aria-hidden="true">↗</span></span>
       <span className="nav-description">{item.description}</span>
     </Link>

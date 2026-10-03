@@ -6,7 +6,7 @@ import { getDb } from "@/server/db";
 import { includeRun } from "./evaluation-repository";
 import { AppError, assertRole, type Actor } from "@/domain/evaluation";
 import { assertComparable, assertReview, type ReviewInput, type SampleQuery } from "@/domain/comparison-review";
-export const includeSample = { draftUpdatedBy:{select:{id:true,name:true}}, confirmedBy:{select:{id:true,name:true}} } as const;
+export const includeSample = { draftUpdatedBy:{select:{id:true,name:true,role:true}}, confirmedBy:{select:{id:true,name:true,role:true}} } as const;
 export type StoredSample = Prisma.AnomalySampleGetPayload<{include:typeof includeSample}>;
 async function run(id:string) {
   const value=await getDb().evaluationRun.findFirst({where:{id,deletedAt:null},include:includeRun});
@@ -47,7 +47,7 @@ export const comparisonReviewRepository = {
     const selected=await run(sample.runId);
     const [history,staleReportCount]=await Promise.all([
       getDb().reviewRecord.findMany({where:{anomalySampleId:id},include:{reviewer:{select:{id:true,name:true,role:true}}},orderBy:[{createdAt:"desc"},{id:"desc"}]}),
-      getDb().aIReport.count({where:{isStale:true,OR:[{runId:sample.runId},{baselineRunId:sample.runId}]}}),
+      getDb().aIReport.count({where:{isStale:true,currentForRunId:sample.runId}}),
     ]);
     return {sample,run:selected,history,staleReportCount};
   },

@@ -5,7 +5,7 @@ import { requireViewer } from "@/server/auth/require-viewer";
 import { evaluationService } from "@/server/application/evaluation";
 import { AppError, idSchema } from "@/domain/evaluation";
 import { TaskSelector, type TaskModule } from "./task-selector";
-import { RunContext, RunResults } from "./run-context";
+import { RunContext } from "./run-context";
 import { comparisonReviewService } from "@/server/application/comparison-review";
 import { sampleQuerySchema } from "@/domain/comparison-review";
 import { ComparisonView } from "@/features/review/comparison-view";
@@ -16,7 +16,7 @@ import { TaskFlowBackLink } from "./task-flow-back-link";
 import { evidenceHref, resultsHref, type EvidenceContext } from "@/lib/review-links";
 import { reportService } from "@/server/application/report";
 import { ReportList } from "@/features/assistant/report-list";
-const names = { evaluations: "评测任务", comparisons: "模型对比", anomalies: "异常复核", reports: "报告", overview: "总览" };
+const names = { evaluations: "评测任务", comparisons: "模型对比", anomalies: "异常复核", reports: "报告" };
 export type ModuleParams = Promise<Record<string, string | string[] | undefined>>;
 export async function ModuleEntry({ module, searchParams }: { module: TaskModule; searchParams: ModuleParams }) {
   const viewer = await requireViewer();
@@ -27,7 +27,7 @@ export async function ModuleEntry({ module, searchParams }: { module: TaskModule
   if (typeof runId !== "string" || !idSchema.safeParse(runId).success) notFound();
   let run;
   try { run = await evaluationService.get(viewer, runId); } catch (error) { if (error instanceof AppError && error.status === 404) notFound(); throw error; }
-  if (module !== "overview" && run.status !== "SUCCEEDED") return <main className="content workflow-content"><RunContext run={run} href={"/" + module} /><h1>任务结果尚不可用</h1><p className="muted">当前状态：{run.status}。任务完成后才能进入{names[module]}。</p><Link className="primary-button" href={"/evaluations/" + run.id}>查看当前任务 →</Link></main>;
+  if (run.status !== "SUCCEEDED") return <main className="content workflow-content"><RunContext run={run} href={"/" + module} /><h1>任务结果尚不可用</h1><p className="muted">当前状态：{run.status}。任务完成后才能进入{names[module]}。</p><Link className="primary-button" href={"/evaluations/" + run.id}>查看当前任务 →</Link></main>;
   if (module === "comparisons") {
     const baseline = params.baselineRunId === undefined ? run.baselineRunId : params.baselineRunId;
     if (baseline !== null && (typeof baseline !== "string" || baseline !== "" && !idSchema.safeParse(baseline).success)) notFound();
@@ -50,11 +50,12 @@ export async function ModuleEntry({ module, searchParams }: { module: TaskModule
     if (!input.success || baselineRunId !== undefined && (typeof baselineRunId !== "string" || baselineRunId !== "" && !idSchema.safeParse(baselineRunId).success)) notFound();
     reportContext = { metricKey: input.data.metricKey, scenarioKey: input.data.scenarioKey, reviewState: input.data.reviewState, baselineRunId };
   }
+  const reports = await reportService.list(viewer, run.id);
   return <main className="content workflow-content selected-module-view">
     <RunContext run={run} href={"/" + module} /><div className="page-context task-flow-header"><TaskFlowBackLink href={module === "reports" ? evidenceHref(run.id,reportContext) : resultsHref(run.id)} label={module === "reports" ? "返回异常复核" : run.status === "SUCCEEDED" ? "返回评测结果" : "返回任务状态"}/><span>{names[module]} / 当前任务</span></div>
-    <div className="overview-heading"><div><h1>{module === "overview" ? "本次评测总览" : names[module]}</h1><p className="muted">{run.modelName} {run.modelVersion} · {run.datasetName} {run.datasetVersion} · {run.status}</p></div></div>
-    {module === "overview" ? <><RunResults run={run} /><dl className="task-facts"><div><dt>Benchmark</dt><dd>{run.benchmarkName} {run.benchmarkVersion}</dd></div><div><dt>运行口径</dt><dd>{run.episodeCount} Episodes · Seed {run.simulationSeed}</dd></div><div><dt>历史基线</dt><dd>{run.baselineRunId ? "已指定比较对象" : "未指定；可独立执行"}</dd></div></dl><p className="quality-caption muted">{run.successRule}</p></> : <ReportList key={run.id + (typeof params.reportId === "string" ? params.reportId : "")} initial={await reportService.list(viewer, run.id)} role={viewer.role} selectedId={typeof params.reportId === "string" ? params.reportId : undefined} />}
-    <div className="workflow-actions"><Link className="primary-button" href={module === "reports" ? evidenceHref(run.id,reportContext) : run.status === "SUCCEEDED" ? (viewer.role === "ENGINEER" ? "/comparisons" : "/anomalies") + "?runId=" + run.id : resultsHref(run.id)}>{module === "reports" ? "← 返回异常复核" : run.status === "SUCCEEDED" ? viewer.role === "ENGINEER" ? "查看模型对比 →" : "查看异常复核 →" : "查看当前任务 →"}</Link>{module === "reports" && <><Link className="text-action" href={resultsHref(run.id,reportContext.baselineRunId)}>查看评测结果 ↗</Link><Link className="text-action" href={"/overview?runId=" + run.id}>查看本次总览 ↗</Link></>}{viewer.role === "ENGINEER" && <Link className="text-action" href="/evaluations/new">创建新评测 ＋</Link>}</div>
+    <div className="overview-heading"><div><h1>{names[module]}</h1><p className="muted">{run.modelName} {run.modelVersion} · {run.datasetName} {run.datasetVersion} · {run.status}</p></div></div>
+    <ReportList key={`${run.id}:${reports[0]?.updatedAt || "empty"}:${reports[0]?.isStale ? "stale" : "current"}`} initial={reports} role={viewer.role} runId={run.id} />
+    <div className="workflow-actions"><Link className="primary-button" href={module === "reports" ? evidenceHref(run.id,reportContext) : run.status === "SUCCEEDED" ? (viewer.role === "ENGINEER" ? "/comparisons" : "/anomalies") + "?runId=" + run.id : resultsHref(run.id)}>{module === "reports" ? "← 返回异常复核" : run.status === "SUCCEEDED" ? viewer.role === "ENGINEER" ? "查看模型对比 →" : "查看异常复核 →" : "查看当前任务 →"}</Link>{module === "reports" && <Link className="text-action" href={resultsHref(run.id,reportContext.baselineRunId)}>查看评测结果 ↗</Link>}{viewer.role === "ENGINEER" && <Link className="text-action" href="/evaluations/new">创建新评测 ＋</Link>}</div>
     <p className="fine-print">合成数据 · 模拟执行 · 不代表真实模型表现</p>
   </main>;
 }

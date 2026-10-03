@@ -8,8 +8,8 @@ import { isActive } from "@/domain/evaluation";
 import { TASK_SELECTION_PAGE_SIZE, type RunData } from "@/lib/evaluation-dto";
 import { apiRequest, ClientError, errorText } from "@/lib/api-client";
 const labels = { QUEUED: "排队中", RUNNING: "运行中", SUCCEEDED: "已完成", FAILED: "失败", CANCELLED: "已取消" };
-export type TaskModule = "evaluations" | "comparisons" | "anomalies" | "reports" | "overview";
-export const moduleLabels = { evaluations: "评测任务", comparisons: "模型对比", anomalies: "异常复核", reports: "报告", overview: "总览" };
+export type TaskModule = "evaluations" | "comparisons" | "anomalies" | "reports";
+export const moduleLabels = { evaluations: "评测任务", comparisons: "模型对比", anomalies: "异常复核", reports: "报告" };
 export function taskHref(module: TaskModule, id: string) { return module === "evaluations" ? "/evaluations/" + encodeURIComponent(id) : "/" + module + "?runId=" + encodeURIComponent(id); }
 export function TaskSelector({ initial, actor, module }: { initial: { data: RunData[]; total: number }; actor: Actor; module: TaskModule }) {
   const router = useRouter();
@@ -23,7 +23,7 @@ export function TaskSelector({ initial, actor, module }: { initial: { data: RunD
   const deleteTrigger = useRef<HTMLButtonElement>(null);
   const safeAction = useRef<HTMLButtonElement>(null);
   const selected = list.data.find(r => r.id === selectedId);
-  const resultsOnly = !["evaluations", "overview"].includes(module);
+  const resultsOnly = module !== "evaluations";
   const canDelete = selected && actor.role === "ENGINEER" && actor.id === selected.createdById && !selected.isDemoFixture && !isActive(selected.status);
   async function reload(nextPage: number): Promise<void> {
     // 分页读取含 meta 的统一响应，删除后重新查询，避免用旧列表猜测数据库状态。
@@ -49,12 +49,17 @@ export function TaskSelector({ initial, actor, module }: { initial: { data: RunD
     <div className="overview-heading"><div><h1>选择评测任务</h1><p className="muted">{resultsOnly ? "选择已完成的任务，查看本次" + moduleLabels[module] + "。" : "先选择任务，再查看执行状态与评测结果。"}</p></div></div>
     <fieldset className="task-selection" disabled={busy}><legend className="sr-only">{moduleLabels[module]}的评测任务</legend>
       <div className="task-selection-head" aria-hidden="true"><span>任务</span><span>模型 / 数据集</span><span>状态</span></div>
-      {list.data.map(run => { const disabled = resultsOnly && run.status !== "SUCCEEDED"; return <label key={run.id} className={"task-selection-row" + (selectedId === run.id ? " is-selected" : "") + (disabled ? " is-unavailable" : "")}>
-        <input type="radio" name="runId" value={run.id} checked={selectedId === run.id} onChange={() => setSelectedId(run.id)} />
-        <span><strong>{run.name}</strong><small>{run.id} · {run.isDemoFixture ? "预置合成示例" : "新建模拟任务"}</small><small>{new Date(run.createdAt).toLocaleString("zh-CN")}</small></span>
-        <span>{run.modelName} {run.modelVersion}<small>{run.datasetName} {run.datasetVersion}</small></span>
-        <span>{labels[run.status]}{run.pendingReviewCount > 0 && <small className="risk-text">{run.pendingReviewCount} 条待复核 · 需评测人员复核</small>}{disabled && <small>结果尚不可用</small>}</span>
-      </label>; })}
+      {list.data.map(run => {
+        const disabled = resultsOnly && run.status !== "SUCCEEDED";
+        const inputId = `task-${module}-${run.id}`, titleId = `${inputId}-title`;
+        // 任务文字关联原生单选框；待复核数量只显示状态，不在任务列表增加跳转。
+        return <div key={run.id} className={"task-selection-row" + (selectedId === run.id ? " is-selected" : "") + (disabled ? " is-unavailable" : "")}>
+          <input id={inputId} type="radio" name="runId" value={run.id} aria-labelledby={titleId} checked={selectedId === run.id} onChange={() => setSelectedId(run.id)} />
+          <span><label htmlFor={inputId}><strong id={titleId}>{run.name}</strong><small>{run.id} · {run.isDemoFixture ? "预置合成示例" : "新建模拟任务"}</small><small>{new Date(run.createdAt).toLocaleString("zh-CN")}</small></label></span>
+          <span><label htmlFor={inputId}>{run.modelName} {run.modelVersion}<small>{run.datasetName} {run.datasetVersion}</small></label></span>
+          <span><label htmlFor={inputId}>{labels[run.status]}{run.pendingReviewCount > 0 && <small className="risk-text">{run.pendingReviewCount} 条待复核 · 需评测人员复核</small>}{disabled && <small>结果尚不可用</small>}</label></span>
+        </div>;
+      })}
     </fieldset>
     {!list.data.length && <p className="task-list-empty">暂无任务。{actor.role === "ENGINEER" ? "可以先创建评测。" : "等待算法工程师创建评测。"}</p>}
     <nav className="task-pagination" aria-label="任务列表分页">

@@ -91,16 +91,16 @@ describe.skipIf(!testUrl)("独立 PostgreSQL 测试库", () => {
       expect(reviewSamples[0].confirmedRevision).toBe(2);
       expect(await db.reviewRecord.count({ where: { anomalySampleId: reviewSamples[0].id } })).toBe(2);
       // 验证页面实际使用的关系查询，而不只检查表中存在固定 ID。
-      const { overviewRepository } = await import("../../src/server/repositories/overview-repository");
+      const { evaluationRepository } = await import("../../src/server/repositories/evaluation-repository");
       const { getDb } = await import("../../src/server/db");
       try {
-        const project = await overviewRepository.getDemoProject();
-        const candidate = project?.runs.find((run) => run.baselineRunId);
+        const candidate = await evaluationRepository.get("demo-run-candidate");
         expect(candidate?.episodeCount).toBe(200);
         expect(candidate?.metricResults).toHaveLength(4);
         expect(candidate?.anomalies.filter((sample) => sample.status === "RESOLVED")).toHaveLength(2);
-        expect(candidate?.anomalies.flatMap((sample) => sample.backfills)).toHaveLength(1);
-        expect(candidate?.reports[0].confirmedBy?.name).toBe("陈复核");
+        expect(candidate?.modelVersion.version).toBe("v2.4");
+        expect(candidate?.baselineRunId).toBe("demo-run-baseline");
+        expect(candidate?._count.anomalies).toBe(2);
       } finally {
         await getDb().$disconnect();
       }

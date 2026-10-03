@@ -10,6 +10,11 @@ export function isDemoRole(role: string): role is DemoRole {
   return role === "ENGINEER" || role === "REVIEWER";
 }
 
+// 界面统一显示身份名称；旧数据库里的昵称也不再带到页面或复核历史。
+export function demoIdentityLabel(role: string): string {
+  return isDemoRole(role) ? demoIdentities[role].label : "历史账号";
+}
+
 // 三个条件都来自数据库；旧管理员和被改错角色的账号不能继续演示会话。
 export function isDemoAccount(user: { email: string; role: string; isDemo: boolean }): boolean {
   return user.isDemo && isDemoRole(user.role) && user.email === demoIdentities[user.role].email;

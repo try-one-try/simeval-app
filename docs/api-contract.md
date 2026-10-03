@@ -4,7 +4,7 @@
 
 ## 1. 可调用与待实施
 
-**2026-10-03，接口版本 0.8.0。** 原十四项加五项聊天、四项报告，共 23 项已实现；指派／重开两项保留 planned。阶段 8 本地手工验收与生产发布尚待完成。
+**2026-10-03，接口版本 0.9.0。** 原十四项加五项聊天、四项报告，共 23 项已实现；指派／重开两项保留 planned。报告现改为每任务一份系统报告，与聊天独立；阶段 8 本地手工验收与生产发布尚待完成。
 
 仅两个预设账号会话有效，旧 ADMIN 返回 401。工程师管理本人任务，评测人员只读任务；服务端拒绝越权写入。回补和人工分类退出当前产品，历史数据库关系保留。
 
@@ -13,7 +13,8 @@
 - **身份与写入**：校验 Session、预设账号 email／isDemo 和数据库角色；写入要求同源 Origin、Zod 与业务权限。POST／PATCH／DELETE 都校验 Origin。
 - **输入与分页**：ID 长 1–64，仅字母／数字／下划线／连字符；Body 拒绝多余字段。任务名 trim 后 1–120 字，Episode 1–10000，Seed 0–2147483647；目录另收紧 Episode。page 从 1，pageSize 默认 20／最多 100，任务按时间倒序＋ID 排序；异常按 sampleNumber＋ID 升序。
 - **响应**：成功 `{data,meta:{requestId}}`；错误 `{error:{code,message,fieldErrors,requestId}}`。fieldErrors 为字段消息数组映射或 null；不泄漏 SQL、密码或堆栈。
-- **幂等**：创建／重试带 1–128 字符 Idempotency-Key；聊天改用正文 requestKey UUID，报告按来源轮次自动去重。同用户／操作／键及内容重复返回原对象；同键换内容 409。创建首次 201，重复 200。
+- **身份显示**：复核中的编辑者、确认人和历史操作者 `name` 使用“算法工程师”“评测人员”等角色名称，不使用旧账号昵称；`id` 与原记录关联不变。
+- **幂等**：创建／重试带 1–128 字符 Idempotency-Key；聊天用正文 requestKey UUID。同用户／操作／键及内容重复返回原对象；同键换内容 409。创建首次 201，重复 200。报告不收幂等头：按任务唯一键维护一份，来源未变化时返回原报告，变化时更新同一 ID。
 - **四个标识**：requestId 跟踪一次请求；runId 定位任务；幂等键识别重复动作；expectedVersion 防止编辑覆盖。
 
 ## 3. 当前状态与模拟逻辑
@@ -178,7 +179,7 @@ PATCH 返回完整详情，sample.version 是下一次编辑的 expectedVersion�
 
 草稿与最终内容分开；保存增加编辑 version，最终文本变化才增加 confirmedRevision。每次成功保存追加历史与审计，版本冲突 409 不写任何部分；界面保留输入，读取最新记录后人工核对再存。
 
-确认内容改变时，同事务标记引用此任务的旧报告 isStale；草稿及相同文本确认不会标记过时。阶段 8 已接入新格式报告保存、读取与确认；历史报告不自动更新。网页首次比较沿用任务创建时的基线；用户选择“不对比”只改 URL，不改任务配置。
+确认内容改变时，同事务标记引用此任务的报告 isStale；草稿及相同文本确认不会写这个失效标记。报告读取及确认还比较来源指纹，草稿修改也可能使报告过时。报告不会随复核自动改正文，用户在报告页更新同一份报告；更新前内容留审计。网页首次比较沿用任务创建时的基线；用户选择“不对比”只改 URL，不改任务配置。
 
 ## 6. 变更记录
 
@@ -196,7 +197,7 @@ PATCH 返回完整详情，sample.version 是下一次编辑的 expectedVersion�
 
 ## 阶段 8：聊天与报告
 
-这些 JSON 接口仍使用 data/meta.requestId，错误沿用 error.code/message/fieldErrors/requestId。所有接口要求新登录令牌中的 accessId，写操作检查 Origin。字段及逐行事件完整定义在 OpenAPI 0.8.0。
+这些 JSON 接口仍使用 data/meta.requestId，错误沿用 error.code/message/fieldErrors/requestId，写操作检查 Origin。聊天接口要求登录令牌中的 accessId；报告接口使用普通业务身份校验，不依赖 accessId、sessionId 或 turnId。字段及逐行事件完整定义在 OpenAPI 0.9.0。
 
 | 方法与路径 | 请求 | 返回／约束 |
 |---|---|---|
@@ -205,10 +206,10 @@ PATCH 返回完整详情，sample.version 是下一次编辑的 expectedVersion�
 | GET /api/assistant/sessions/{sessionId} | 路径 ID | session、最多 16 个 turns，历史来源变化时 stale=true |
 | POST /api/assistant/sessions/{sessionId}/messages | question 1–2000 字、requestKey UUID、可空 sampleId | application/x-ndjson；同键同内容不重跑，不同内容 409 |
 | POST /api/assistant/sessions/{sessionId}/turns/{turnId}/stop | 路径 ID，无正文 | stopped=true，尽力中止；不承诺退回已消费额度 |
-| GET /api/ai-reports | 必填 runId | 最新 30 个共享 Report |
-| POST /api/ai-reports | sessionId、turnId | 从自己的成功轮次保存模板报告，首次／重复均 200；不传报告文本或幂等头 |
-| GET /api/ai-reports/{reportId} | 路径 ID | Report；工程师和评测人员均可读 |
-| POST /api/ai-reports/{reportId}/confirm | 无正文 | REVIEWER 专用；来源变更返回 409 |
+| GET /api/ai-reports | 必填 runId | 无报告返回 []，已有当前报告返回 [Report]，最多一份 |
+| POST /api/ai-reports | 仅 runId | 生成／更新系统报告，200；来源未变复用，变化更新同一 ID 并恢复 READY；不调用模型 |
+| GET /api/ai-reports/{reportId} | 路径 ID | 当前 Report；工程师和评测人员均可读；旧重复记录返回 404 |
+| POST /api/ai-reports/{reportId}/confirm | expectedSourceHash，64 位十六进制 | REVIEWER 专用；来源变化返回 SOURCE_CHANGED，报告已由他人更新返回 VERSION_CONFLICT，均为 409 |
 
 创建会话示例：
 
@@ -224,8 +225,35 @@ PATCH 返回完整详情，sample.version 是下一次编辑的 expectedVersion�
 
 流中的每行是一个事件：start 带 turnId，trace 带工具状态，text 带 delta，done 带完整 turn；保存故障可能以 error 结束。客户端按换行读取，不能把整个响应当单个 JSON。HTTP 200 不代表分析成功，必须检查 done.turn.status；流开始前的认证／额度错误仍使用普通 HTTP 错误状态。
 
-Turn 含问题、答案、状态、工具记录、证据快照、model、用量、时间及 stale。Report 含 id/runId/status/isStale/createdAt/confirmedAt/model/output；output 是 version=1、title、summary、metrics、findings、limitations、sourceTurnId。报告不公开聊天文本或工程师专用比较内容。
+Turn 含问题、答案、状态、工具记录、证据快照、model、用量、时间及 stale。Agent 仅用于聊天与证据查询，回答不保存成报告。
 
-新增错误：RUN_IN_PROGRESS、CONTEXT_LIMIT、SOURCE_CHANGED、IDEMPOTENCY_CONFLICT（409）；RATE_LIMITED、BUDGET_EXHAUSTED（429）；MODEL_CONFIG／MODEL_UNAVAILABLE（503）；引用失败、模型错误、超时和中止在流终态体现。来源指纹包括草稿编辑版本，可能比原有最终结论失效标记更保守。
+Report 含 id、runId、status、isStale、createdAt、updatedAt、sourceHash、confirmedAt、model、output；model 恒为 null。output 是 version=1、title、summary、metrics、findings、limitations，不含聊天轮次或 sourceTurnId。系统模板只整理当前任务指标和人工结论，不公开私聊或工程师专用比较内容。
+
+报告生成示例，不需要先聊天：
+
+~~~http
+POST /api/ai-reports
+Cookie: <当前会话 Cookie>
+Origin: <当前站点 Origin>
+Content-Type: application/json
+
+{"runId":"demo-run-candidate"}
+~~~
+
+确认示例：expectedSourceHash 必须取自刚读取的 Report.sourceHash，以下值只是格式示例。
+
+~~~http
+POST /api/ai-reports/{reportId}/confirm
+Cookie: <评测人员的当前会话 Cookie>
+Origin: <当前站点 Origin>
+Content-Type: application/json
+
+{"expectedSourceHash":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}
+~~~
+
+同任务重复生成不创建第二份；来源变化时更新原报告，清除原确认信息并恢复 READY。更新前正文、来源和确认信息写入审计。保留 /api/ai-reports 路径与 AIReport 表名兼容已有结构，但当前报告由后端生成，不消费模型额度。独立总览已取消，旧 /overview 地址重定向至对应结果或任务列表，业务 API 数量不受影响。
+
+新增错误：RUN_IN_PROGRESS、CONTEXT_LIMIT、SOURCE_CHANGED、VERSION_CONFLICT、IDEMPOTENCY_CONFLICT（409）；RATE_LIMITED、BUDGET_EXHAUSTED（429）；MODEL_CONFIG／MODEL_UNAVAILABLE（503）。模型与额度错误只用于聊天，引用失败、模型错误、超时和中止在流终态体现。报告来源指纹包括草稿编辑版本，草稿变化也可能要求更新报告；来源与确认版本冲突须重新读取后由用户核对。
 
 | 2026-10-03 | 0.8.0 | 登录访问隔离、NDJSON 调查、有限运行和证据模板报告；报告旧 planned 请求由 sessionId/turnId 替代 |
+| 2026-10-03 | 0.9.0 | 报告改为每任务一份系统模板，与聊天独立；生成仅 runId，确认必须 expectedSourceHash，返回增加 updatedAt/sourceHash，移除 output.sourceTurnId；独立总览取消 |

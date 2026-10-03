@@ -24,7 +24,7 @@ export type TurnView = {
   id: string; requestKey: string; question: string; answer: string | null;
   status: string; errorMessage: string | null; evidence: Evidence[]; traces: ToolTrace[];
   createdAt: string; model: string; inputTokens: number | null; outputTokens: number | null;
-  stale: boolean; reportId?: string;
+  stale: boolean;
 };
 export type AssistantEvent =
   | { type: "start"; turnId: string }
@@ -37,9 +37,11 @@ export const reportOutputSchema = z.object({
   version: z.literal(1), title: z.string(), summary: z.string(),
   metrics: z.array(z.object({ name: z.string(), scenario: z.string(), value: z.number(), unit: z.string() })),
   findings: z.array(z.object({ sampleId: z.string(), label: z.string(), conclusion: z.string(), confirmed: z.boolean() })),
-  limitations: z.array(z.string()), sourceTurnId: z.string(),
+  limitations: z.array(z.string()),
 });
 export type ReportView = {
-  id: string; runId: string; status: string; isStale: boolean; createdAt: string;
+  id: string; runId: string; status: string; isStale: boolean; createdAt: string; updatedAt: string; sourceHash: string;
   confirmedAt: string | null; output: z.infer<typeof reportOutputSchema>; model: string | null;
 };
+export const generateReportSchema = z.object({ runId: idSchema }).strict();
+export const confirmReportSchema = z.object({ expectedSourceHash: z.string().regex(/^[a-f0-9]{64}$/) }).strict();

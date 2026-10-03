@@ -5,9 +5,8 @@ import { AssistantRuntimeProvider, useLocalRuntime, useAuiState, useAui, type Ch
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
-import { ArrowUp, Square, FileText, ChevronDown, ExternalLink } from "lucide-react";
-import type { AssistantEvent, SessionView, ToolTrace, TurnView, ReportView } from "@/domain/assistant";
-import { assistantRequest } from "./api-client";
+import { ArrowUp, Square, ChevronDown, ExternalLink } from "lucide-react";
+import type { AssistantEvent, SessionView, ToolTrace, TurnView } from "@/domain/assistant";
 import { assistantContent } from "./content";
 import styles from "./assistant.module.css";
 
@@ -80,21 +79,10 @@ function ToolLog({ traces }: { traces: ToolTrace[] }) {
     <ol>{traces.map(trace => <li key={trace.id}><div><strong>{trace.label}</strong><span>{trace.status === "running" ? "进行中" : trace.status === "error" ? "未成功" : `${trace.durationMs} ms`}</span></div><p>{trace.summary}</p><code>{trace.tool}({trace.input === "{}" ? "" : trace.input})</code></li>)}</ol>
   </details>;
 }
-function AnswerExtras({ turn, session }: { turn: TurnView; session: SessionView }) {
-  const [report, setReport] = useState<ReportView | null>(null), [saving, setSaving] = useState(false), [error, setError] = useState("");
-  async function save() {
-    setSaving(true); setError("");
-    try { setReport(await assistantRequest<ReportView>("/api/ai-reports", { sessionId: session.id, turnId: turn.id })); }
-    catch (e) { setError(e instanceof Error ? e.message : "保存失败"); } finally { setSaving(false); }
-  }
+function AnswerExtras({ turn }: { turn: TurnView }) {
   return <>
-    {turn.stale && <p className={styles.warning}>来源已更新，这是历史回答；请重新分析后再生成报告。</p>}
+    {turn.stale && <p className={styles.warning}>来源已更新，这是历史回答；请重新提问核对当前记录。</p>}
     {turn.evidence.length > 0 && <div className={styles.evidenceList}>{turn.evidence.map(e => <Link key={e.id} href={e.href} className={styles.evidenceCard}><span>{e.id}</span><div><strong>{e.title}</strong><small>{e.summary}</small></div><ExternalLink size={12} /></Link>)}</div>}
-    {turn.status === "SUCCEEDED" && turn.evidence.length > 0 && <div className={styles.answerActions}>
-      {report ? <Link href={`/reports?runId=${session.runId}&reportId=${report.id}`}>查看已保存报告 ↗</Link> : <button type="button" disabled={saving || turn.stale} onClick={() => void save()}><FileText size={13} />{saving ? "正在保存…" : "保存当前任务证据报告"}</button>}
-      <small>保存后按角色共享；不公开这段聊天。</small>
-    </div>}
-    {error && <p role="alert" className={styles.warning}>{error}</p>}
     <p className={styles.usage}>{turn.model} · {turn.inputTokens === null ? "用量未返回" : `${turn.inputTokens + (turn.outputTokens || 0)} tokens`} · {new Date(turn.createdAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}</p>
   </>;
 }
@@ -122,7 +110,7 @@ function ConversationBody({ session, onActivity }: { session: SessionView; onAct
           {message.role === "assistant" && <ToolLog traces={traces} />}
           <div className={styles.markdown}><ReactMarkdown skipHtml components={{ a: ({ children }) => <span>{children}</span>, img: () => null }}>{text || (running ? "正在分析…" : "本轮已停止")}</ReactMarkdown></div>
           {message.role === "assistant" && !turn && <p className={styles.usage}>{running ? "生成中，引用尚待核对" : metadata.failed ? "未完成 · 可修改问题后重新发送" : "本轮未完整结束 · 可从历史核对"}</p>}
-          {turn && <AnswerExtras turn={turn} session={session} />}
+          {turn && <AnswerExtras turn={turn} />}
         </article>;
       })}
     </div>

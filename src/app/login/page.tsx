@@ -11,7 +11,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <section className="identity-entry" aria-labelledby="identity-title">
       <h2 id="identity-title">选择演示身份</h2><p className="muted">选择一种身份进入工作区，可随时切换。</p>
       <AccessLoginForm initialRole={initialRole} initialError={initialError} />
-      {error === "signin" && <Link className="inline-link" href="/overview">返回已有工作台 →</Link>}
+      {error === "signin" && <Link className="inline-link" href="/evaluations">返回已有工作台 →</Link>}
     </section>
   </main>;
 }

@@ -58,7 +58,7 @@ export const homeContent = {
     // 底部只保留技术栈与演示边界；项目源码已经放在顶部导航。
     signature: "从需求到体验，从代码到证据。",
     stack: ["Next.js", "TypeScript", "PostgreSQL", "Figma"],
-    disclosure: "合成数据 · 模拟执行，不运行真实仿真或训练；AI 报告生成仍在规划中。",
+    disclosure: "合成数据 · 模拟执行，不运行真实仿真或训练；AI 助手提供聊天调查，评测报告由系统整理。",
     copyright: "© 2026 SimEval",
   },
 } as const;

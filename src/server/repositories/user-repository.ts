@@ -1,6 +1,7 @@
 // 用户仓储封装演示身份与会话门禁查询；访问密码不存数据库。
 import "server-only";
 import { getDb } from "@/server/db";
+import { demoIdentityLabel } from "@/lib/demo-identity";
 
 const userSelect = {
   id: true,
@@ -11,10 +12,12 @@ const userSelect = {
 } as const;
 
 export const userRepository = {
-  findByEmail(email: string) {
-    return getDb().user.findUnique({ where: { email }, select: userSelect });
+  async findByEmail(email: string) {
+    const user = await getDb().user.findUnique({ where: { email }, select: userSelect });
+    return user ? { ...user, name: demoIdentityLabel(user.role) } : null;
   },
-  findById(id: string) {
-    return getDb().user.findUnique({ where: { id }, select: userSelect });
+  async findById(id: string) {
+    const user = await getDb().user.findUnique({ where: { id }, select: userSelect });
+    return user ? { ...user, name: demoIdentityLabel(user.role) } : null;
   },
 };

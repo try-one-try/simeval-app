@@ -24,8 +24,8 @@ export function ReviewEditor({detail,actor,onSaved}:{detail:SampleDetailData;act
     catch(failure){setError(errorText(failure));}finally{setBusy(false);}
   }
   return <>
-    <button ref={trigger} className="text-action inline-link edit-conclusion" disabled={!canEdit} onClick={open}>编辑／修改结论 ↗</button>
-    {!canEdit&&<p className="fine-print">工程师只能编辑本人任务草稿。</p>}
+    <button type="button" ref={trigger} className="primary-button edit-conclusion" disabled={!canEdit} onClick={open}>编辑/复核结论 ↗</button>
+    <p className="review-entry-caption">{!canEdit?"算法工程师仅能编辑本人任务的草稿；当前样本需由评测人员复核。":actor.role==="REVIEWER"?"核对日志后，点击上方按钮填写或修改结论，并确认最终结果。":"核对日志后，点击上方按钮填写草稿；最终结论由评测人员确认。"}</p>
     {message&&<p className="review-message" role="status">{message}</p>}
     <dialog ref={dialog} className="confirm-dialog review-dialog" aria-labelledby="review-edit-title" onCancel={e=>{if(busy)e.preventDefault();}} onClose={()=>trigger.current?.focus()}>
       <div className="identity-dialog-heading"><h2 id="review-edit-title">编辑复核结论</h2><button className="text-action" disabled={busy} onClick={()=>dialog.current?.close()}>关闭 ×</button></div>

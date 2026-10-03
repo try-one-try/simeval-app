@@ -6,11 +6,10 @@ const items = {
   compare: { label: "模型对比", description: "版本差异与指标", href: "/comparisons" },
   review: { label: "异常复核", description: "证据与人工结论", href: "/anomalies" },
   reports: { label: "报告", description: "证据整理与人工确认", href: "/reports" },
-  overview: { label: "总览", description: "所选任务的结果与进度", href: "/overview" },
 } as const;
 export function workspaceItems(role: DemoRole) {
-  return (role === "ENGINEER" ? ["create", "tasks", "compare", "review", "reports", "overview"] as const
-    : ["review", "reports", "tasks", "overview"] as const).map((key) => items[key]);
+  return (role === "ENGINEER" ? ["create", "tasks", "compare", "review", "reports"] as const
+    : ["tasks", "review", "reports"] as const).map((key) => items[key]);
 }
 export function isCurrentItem(path: string, href: string) {
   if (href === "/evaluations/new") return path === href || path === "/quality";
