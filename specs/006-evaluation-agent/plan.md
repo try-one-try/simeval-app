@@ -1,6 +1,6 @@
 # 评测助手实施计划与当前实现
 
-2026-10-04：代码 `3b81783` 已部署，正式库增量迁移完成，生产登录与只读接口检查通过。负责人已确认 Production 三项 AI 变量和 Redeploy Ready；正式站首次问答在模型阶段失败，等待日志定位。负责人完整页面验收和阶段验收仍未完成。范围见 [spec.md](spec.md)，数据见 [data-model.md](data-model.md)，操作见 [quickstart.md](quickstart.md)。
+2026-10-04：代码 `3b81783` 已部署，正式库增量迁移完成，生产登录与只读接口检查通过。负责人已确认 Production 三项 AI 变量和 Redeploy Ready；模型失败已定位为 401 密钥认证失败，待更换 Production 密钥后重新部署并验证一次真实问答。负责人完整页面验收和阶段验收仍未完成。范围见 [spec.md](spec.md)，数据见 [data-model.md](data-model.md)，操作见 [quickstart.md](quickstart.md)。
 
 ## 1. 实际技术栈
 
@@ -21,9 +21,10 @@
 
 | 文件 | 职责 |
 |---|---|
-| features/assistant/appearance.ts、content.ts | 起伏／倾斜／弹跳参数、名字和示例问题 |
+| features/assistant/appearance.ts、content.ts | 起伏／倾斜／弹跳参数、名字、示例问题和继续询问文案 |
+| features/assistant/follow-up.ts | 纯函数按本轮可信证据、样本、基线与原问题选择最多三个追问 |
 | assistant-host.tsx、assistant-panel.tsx | 登录后单次挂载、按需加载、任务／基线和窗口／历史状态 |
-| conversation.tsx、report-list.tsx | 聊天适配器、停止、Markdown、调用记录、证据卡、报告界面 |
+| conversation.tsx、report-list.tsx | 聊天适配器、停止、Markdown、调用记录、证据卡、继续询问按钮、报告界面 |
 | auth.ts、server/http/assistant-api.ts | 每次登录生成 accessId，接口重查账号及访问标识 |
 | server/agent/model.ts | 唯一模型接入点、官方地址、局部代理，无隐式重试 |
 | server/agent/error-diagnostics.ts | 读取框架包装内的错误分类，仅记录允许的状态码和诊断字段 |
@@ -44,6 +45,8 @@
 报告入口为 `POST /api/ai-reports {runId}`，不接收聊天轮次。确认入口为 `POST /api/ai-reports/{reportId}/confirm {expectedSourceHash}`。报告已被其他人更新时返回 VERSION_CONFLICT；报告来源已变化时返回 SOURCE_CHANGED，均拒绝确认并要求先重新核对。
 
 登录访问标识与账号共同隔离聊天；旧令牌缺标识需重新登录。每轮向模型提供最近三轮成功问答；工具数据快照和调用记录另外落库，历史引用不能作为本轮证据。失败轮次不混入下次上下文；未实现长期记忆。
+
+继续询问由客户端从固定文案中选择，依据本轮 TurnView 的可信证据类型、样本证据、绑定基线与原问题；历史成功回答复用同一函数重建。仅成功轮次显示，无基线不推荐比较。conversation.tsx 接入轻量 CSS 按钮，点击替换并聚焦输入框，用户编辑后自行发送；新一轮生成时按钮禁用。建议选择与点击不增加模型调用、token、HTTP 请求或数据库字段。
 
 Markdown 禁用 HTML、模型图片和外链；只有服务端生成的证据卡可导航。报告使用当前任务指标及人工结论套模板，完全不调用模型，不复制私聊或工程师专用比较文本。两个角色可生成、更新和查看，只有评测人员确认。
 
@@ -73,8 +76,9 @@ Markdown 禁用 HTML、模型图片和外链；只有服务端生成的证据卡
 - 代码 `3b81783` 已部署。正式域名通过密码与 CSRF 正常登录后，`GET /api/auth/session`、`GET /api/assistant/sessions` 和成功任务列表均返回 200，列表包含 8 个成功任务；这组发送问题前的检查共 0 次模型请求。
 - 负责人已确认 Production 的 `OPENAI_API_KEY`、`OPENAI_MODEL` 和 `ASSISTANT_BUDGET_USD` 已配置，且 Redeploy 为 Ready。变量变更需新部署生效，数据库迁移本身不需要重建应用。
 - 随后正式站发送一条问题：登录、初始化和创建会话均返回 200，消息 HTTP 也为 200，但流的 `done.turn.status=FAILED`，无回答、工具调用或证据。只读已保存轮次确认 `MODEL_ERROR`、`modelCalls=1`，输入／输出用量和 `chargedMicros` 均为 null。HTTP 200 不表示模型回答成功。
-- 未知用量按规则保留 400000 微美元（$0.40）预算预留，该金额不是已确认的实际费用。当前等待 Vercel `assistant_run_failed` 日志的 `name/status/code` 定位原因，不重试、不清账本；真实问答、流、保存、平台时限和页面验收仍未通过。
-- 已补充服务端诊断代码：当前 LangChain 中间件把供应商错误放入 `cause`，旧日志只读外层可能丢失状态码。新日志限深读取原因链，只记录白名单错误类别、HTTP 状态、供应商／网络错误码、参数名和请求 ID，不输出错误正文、聊天或密钥；HTTP、前端提示和费用规则均未变。此补充尚未部署，按负责人约定只做源码审阅，未运行检查或模型请求。
+- 未知用量按规则保留 400000 微美元（$0.40）预算预留，该金额不是已确认的实际费用。已定位为该部署所用密钥认证失败，具体为何无效仍未核实。待负责人替换 Vercel Production 的 `OPENAI_API_KEY`、Redeploy 到 Ready 后验证一次真实问答；更换前不重复请求，不清账本。真实问答、流、保存、平台时限和页面验收仍未通过。
+- 服务端诊断代码已线上生效：LangChain 中间件把供应商错误放入 `cause`，新日志限深读取原因链，只记录白名单诊断字段，不输出错误正文、聊天或密钥。负责人提供的 23:26 `assistant_run_failed` 日志确认 `status=401`、`providerCode=invalid_api_key`、`providerType=invalid_request_error`、`langchainCode=MODEL_AUTHENTICATION`。诊断代码按约定只做源码审阅，未运行检查；HTTP、前端提示和费用规则均未变。
+- 继续询问代码与文档已实现，页面待负责人按 quickstart 手工验收；本次按约定未运行检查、测试、构建或模型请求，不视为线上接通或验收通过。
 
 ## 官方依据
 

@@ -101,6 +101,13 @@
 .answerActions button,.answerActions>a { display:inline-flex; gap:6px; align-items:center; padding:7px 9px; border:1px solid #ddd; border-radius:6px; background:white; color:#333; font-size:11px; text-decoration:none; }
 .answerActions small,.usage { color:#88887f; font-size:9px; line-height:1.6; }
 .usage { margin-top:9px; }
+/* 回答后的追问用小按钮展示，点击只填入下方输入框。 */
+.followUps { margin-top:14px; }
+.followUpLabel { display:flex; flex-wrap:wrap; gap:4px 9px; align-items:center; margin-bottom:7px; font-size:11px; color:#55554f; }
+.followUpLabel>span { font-size:9px; color:#88887f; }
+.followUpButtons { display:flex; flex-wrap:wrap; gap:6px; }
+.followUpButtons button { max-width:100%; padding:7px 10px; border:1px solid #e1e1dc; border-radius:8px; background:#fafaf8; color:#44443f; text-align:left; font:inherit; font-size:11px; line-height:1.6; overflow-wrap:anywhere; transition:background .15s,border-color .15s; }
+.followUpButtons button:hover:not(:disabled) { border-color:#aaa; background:#f0f0ed; color:#222; }
 .warning,.errorBox { padding:10px; background:#faf6ee; color:#795b31; border-radius:8px; font-size:11px; line-height:1.8; margin:8px 0; }
 .errorBox { margin:10px 16px; }
 .errorBox a { text-decoration:underline; }

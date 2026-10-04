@@ -8,6 +8,7 @@ import ReactMarkdown from "react-markdown";
 import { ArrowUp, Square, ChevronDown, ExternalLink } from "lucide-react";
 import type { AssistantEvent, SessionView, ToolTrace, TurnView } from "@/domain/assistant";
 import { assistantContent } from "./content";
+import { getFollowUpSuggestions } from "./follow-up";
 import styles from "./assistant.module.css";
 
 export function Conversation({ session, turns, sampleId, onActivity, onSaved }: {
@@ -86,6 +87,17 @@ function AnswerExtras({ turn }: { turn: TurnView }) {
     <p className={styles.usage}>{turn.model} · {turn.inputTokens === null ? "用量未返回" : `${turn.inputTokens + (turn.outputTokens || 0)} tokens`} · {new Date(turn.createdAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}</p>
   </>;
 }
+function FollowUpQuestions({ turn, session, disabled, onSelect }: {
+  turn: TurnView; session: SessionView; disabled: boolean; onSelect: (prompt: string) => void;
+}) {
+  const suggestions = getFollowUpSuggestions(turn, session);
+  if (!suggestions.length) return null;
+  return <div className={styles.followUps} role="group" aria-label={assistantContent.followUpLabel}>
+    <p className={styles.followUpLabel}>{assistantContent.followUpLabel}<span>{assistantContent.followUpHint}</span></p>
+    <div className={styles.followUpButtons}>{suggestions.map(item => <button key={item.prompt} type="button" disabled={disabled}
+      title={item.prompt} aria-label={`将问题填入输入框：${item.prompt}`} onClick={() => onSelect(item.prompt)}>{item.title}</button>)}</div>
+  </div>;
+}
 function ConversationBody({ session, onActivity }: { session: SessionView; onActivity: (busy: boolean) => void }) {
   const messages = useAuiState(s => s.thread.messages), running = useAuiState(s => s.thread.isRunning);
   const runtime = useAui();
@@ -93,13 +105,18 @@ function ConversationBody({ session, onActivity }: { session: SessionView; onAct
   const viewport = useRef<HTMLDivElement>(null), follow = useRef(true), input = useRef<HTMLTextAreaElement>(null);
   useEffect(() => { onActivity(running); return () => onActivity(false); }, [running, onActivity]);
   useEffect(() => { if (follow.current && viewport.current) viewport.current.scrollTop = viewport.current.scrollHeight; }, [messages, running]);
+  // 快捷问题只填进输入框；访客可以改写，再自行点击发送。
+  function prefill(prompt: string) {
+    if (running) return;
+    setDraft(prompt); input.current?.focus({ preventScroll: true });
+  }
   function send() {
     if (!draft.trim() || running) return;
     follow.current = true; runtime.thread.append({ role: "user", content: [{ type: "text", text: draft.trim() }] }); setDraft("");
   }
   return <>
     <div className={styles.chatBody} ref={viewport} onScroll={() => { const e = viewport.current; if (e) follow.current = e.scrollHeight - e.scrollTop - e.clientHeight < 100; }}>
-      {!messages.length && <div className={styles.chatWelcome}><span className={styles.eyebrow}>LET’S INVESTIGATE</span><h3>从一个问题开始。</h3><p>围绕「{session.runName}」查询指标、异常与证据。</p><div className={styles.suggestions}>{assistantContent.suggestions.map(item => <button key={item.title} type="button" onClick={() => { setDraft(item.prompt); input.current?.focus(); }}><span><strong>{item.title}</strong><small>{item.description}</small></span><ArrowUp size={14} /></button>)}</div></div>}
+      {!messages.length && <div className={styles.chatWelcome}><span className={styles.eyebrow}>LET’S INVESTIGATE</span><h3>从一个问题开始。</h3><p>围绕「{session.runName}」查询指标、异常与证据。</p><div className={styles.suggestions}>{assistantContent.suggestions.map(item => <button key={item.title} type="button" onClick={() => prefill(item.prompt)}><span><strong>{item.title}</strong><small>{item.description}</small></span><ArrowUp size={14} /></button>)}</div></div>}
       {messages.map(message => {
         const metadata = message.metadata.custom;
         const turn = metadata.turn as TurnView | undefined;
@@ -111,6 +128,7 @@ function ConversationBody({ session, onActivity }: { session: SessionView; onAct
           <div className={styles.markdown}><ReactMarkdown skipHtml components={{ a: ({ children }) => <span>{children}</span>, img: () => null }}>{text || (running ? "正在分析…" : "本轮已停止")}</ReactMarkdown></div>
           {message.role === "assistant" && !turn && <p className={styles.usage}>{running ? "生成中，引用尚待核对" : metadata.failed ? "未完成 · 可修改问题后重新发送" : "本轮未完整结束 · 可从历史核对"}</p>}
           {turn && <AnswerExtras turn={turn} />}
+          {message.role === "assistant" && turn && <FollowUpQuestions turn={turn} session={session} disabled={running} onSelect={prefill} />}
         </article>;
       })}
     </div>
