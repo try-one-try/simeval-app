@@ -41,9 +41,22 @@
 - MODEL_ERROR：核对模型网络、权限或账户额度；用量不明时保留预算预留。
 - SOURCE_CHANGED：报告依据已变化，更新当前报告后重新核对并确认；不要求重新聊天。
 - VERSION_CONFLICT：报告已被他人更新，先读取当前报告并核对，不能沿用旧页面的确认请求。
-- BUDGET_EXHAUSTED：累计账本不足下一轮预留；不删除账本来伪造用量。线上额度另行明确。
+- BUDGET_EXHAUSTED：累计账本不足下一轮预留；不删除账本来伪造用量。本次开发与生产验证合计上限 $3，已有用量和预留金额仍计入。
 - 超时／中止不自动重试，重新发送会开始新聊天轮次。聊天历史只属于当前有效登录，重新登录不恢复旧私聊；系统报告按任务共享，不读取聊天内容。
 
-## 上线前
+## 现有生产环境更新
 
-Vercel 设置生产模型密钥、模型名、已确定的累计预算；不要配置本机 localhost 代理。核对生产连接后只应用新增迁移，不执行 Seed／恢复。消息接口声明 `maxDuration=90`，应用内部一轮 60 秒，仍须核对平台实际限制。发布后检查登录隔离、流、真实模型、报告和移动端；本地成功不表示线上通过。
+1. 先确认 Vercel Production 指向的生产数据库。在本机被 Git 忽略的 `.env.production.local` 中同时配置 `DATABASE_URL`（连接池）和 `DIRECT_URL`（直连），二者必须来自同一分支／数据库。Neon 提供 `DATABASE_URL_UNPOOLED` 时，将该地址填入本机文件的 `DIRECT_URL`。任何一项缺失都应停止，避免 Prisma 从 `.env.local` 补入开发连接；不要展示或提交真实连接与密钥。
+2. 备份并核对业务数据后，只应用新增迁移，不执行 Seed、恢复或重置。在仓库根目录的专用 PowerShell 中先清除当前进程的同名数据库变量，防止其覆盖正式文件，再显式指定 Prisma 7 配置：
+
+   ```powershell
+   Remove-Item Env:DATABASE_URL,Env:DIRECT_URL,Env:DATABASE_URL_UNPOOLED -ErrorAction SilentlyContinue
+   node --env-file=.env.production.local node_modules/prisma/build/index.js migrate deploy --config=prisma7.config.ts
+   ```
+
+   清除只影响当前终端，不改配置文件。迁移后再次核对业务内容和报告 ID；数据库迁移本身不需要重新构建应用。
+3. 在 Vercel 的 Production 设置 `OPENAI_API_KEY`、`OPENAI_MODEL=gpt-5.4-mini`、`ASSISTANT_BUDGET_USD=3`，密钥只核对已配置。不要设置本机 localhost 代理；代码在 Vercel 上会忽略 `OPENAI_PROXY_URL`。变量修改后 Redeploy 最新代码，等待状态 Ready，才会由新部署使用新值。
+4. 先做不调用模型的检查：重新登录，查看成功任务和助手历史，打开助手并创建对话；发送问题才调用模型。报告页独立生成／更新系统报告也不调用模型。
+5. 再按已授权的累计预算做真实问答，核对实际查询、文字流、引用、保存和刷新历史。一次发送可能经过多次模型请求，不应将一轮问答记成一次模型调用。消息接口声明 `maxDuration=90`，应用内部一轮 60 秒，仍须核对平台实际限制；登录隔离、报告和移动端也需人工验收。
+
+2026-10-04：代码 `3b81783` 已部署，正式库两项新增迁移和零模型请求的登录／接口检查已完成；负责人已确认 Production 三项 AI 变量和 Redeploy Ready。首次正式站问答在模型阶段失败，当前等待日志定位，不重试、不清账本。具体证据见 [plan.md](plan.md)，完整验收仍以 [tasks.md](tasks.md) 的未完成项为准。
