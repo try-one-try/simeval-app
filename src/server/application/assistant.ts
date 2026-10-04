@@ -7,6 +7,7 @@ import { comparisonReviewService } from "./comparison-review";
 import { assistantRepository, jsonValue } from "@/server/repositories/assistant-repository";
 import { runInvestigation } from "@/server/agent/agent";
 import { usageMicros } from "@/server/agent/config";
+import { getAssistantErrorDiagnostics } from "@/server/agent/error-diagnostics";
 
 const processState = globalThis as typeof globalThis & { assistantControllers?: Map<string, AbortController> };
 const controllers = processState.assistantControllers ??= new Map();
@@ -53,9 +54,9 @@ export const assistantService = {
         inputTokens: accounting.known ? accounting.input : null, outputTokens: accounting.known ? accounting.output : null }, result.charge);
       emit({ type: "done", turn: saved });
     } catch (error) {
-      // 只记录错误类别和状态码，不记录请求、聊天或 SDK 对象中的密钥。
-      console.warn("assistant_run_failed", { turnId: turn.id, name: error instanceof Error ? error.name : "Unknown", code: error instanceof AppError ? error.code : undefined,
-        status: error && typeof error === "object" && "status" in error && typeof error.status === "number" ? error.status : undefined });
+      // 原始模型错误可能被框架包在 cause 中；只记安全分类，不把错误正文写进日志。
+      console.warn("assistant_run_failed", { turnId: turn.id, code: error instanceof AppError ? error.code : undefined,
+        ...getAssistantErrorDiagnostics(error) });
       const timedOut = Date.now() >= turn.deadlineAt.getTime();
       const failure = error instanceof AppError ? error : new AppError(timedOut ? "TIMEOUT" : signal.aborted ? "CANCELLED" : "MODEL_ERROR",
         timedOut ? "本轮分析超时，请缩小问题范围后重试" : signal.aborted ? "本轮已停止" : "模型服务暂时不可用，请检查网络、账户额度或稍后重试", 502);

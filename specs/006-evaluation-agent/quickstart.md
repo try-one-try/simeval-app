@@ -38,7 +38,7 @@
 - 分析规则：`src/server/agent/agent.ts` 的 systemPrompt；工具字段：`tools.ts`。
 - 次数、上下文、超时：`config.ts`。增大前同时复核费用预留；不是越大越好。
 - 401：旧登录缺访问标识或登录过期，重新登录。
-- MODEL_ERROR：核对模型网络、权限或账户额度；用量不明时保留预算预留。
+- MODEL_ERROR：到 Vercel Logs 展开对应消息 POST 请求，再查看 `assistant_run_failed`。HTTP 200 可能只是流启动，不代表问答成功。新诊断记录 `status`、`errorClass`、`providerCode` 等安全分类：401 先核对生产密钥；429 结合供应商错误码区分额度不足和限流；400 核对参数；无状态时查看网络错误码。旧版本可能只有 `name: Error`，需先发布诊断代码再定位；不能只凭通用提示判断余额。用量不明时保留预算预留。
 - SOURCE_CHANGED：报告依据已变化，更新当前报告后重新核对并确认；不要求重新聊天。
 - VERSION_CONFLICT：报告已被他人更新，先读取当前报告并核对，不能沿用旧页面的确认请求。
 - BUDGET_EXHAUSTED：累计账本不足下一轮预留；不删除账本来伪造用量。本次开发与生产验证合计上限 $3，已有用量和预留金额仍计入。

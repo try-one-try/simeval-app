@@ -26,6 +26,7 @@
 | conversation.tsx、report-list.tsx | 聊天适配器、停止、Markdown、调用记录、证据卡、报告界面 |
 | auth.ts、server/http/assistant-api.ts | 每次登录生成 accessId，接口重查账号及访问标识 |
 | server/agent/model.ts | 唯一模型接入点、官方地址、局部代理，无隐式重试 |
+| server/agent/error-diagnostics.ts | 读取框架包装内的错误分类，仅记录允许的状态码和诊断字段 |
 | server/agent/agent.ts | 提示词、最近三轮成功问答、调用计数和引用校验 |
 | server/agent/tools.ts | 四个只读工具、有限结果、证据快照与真实记录 |
 | server/agent/config.ts | 次数、上下文、超时、模型价格和预算限制 |
@@ -73,6 +74,7 @@ Markdown 禁用 HTML、模型图片和外链；只有服务端生成的证据卡
 - 负责人已确认 Production 的 `OPENAI_API_KEY`、`OPENAI_MODEL` 和 `ASSISTANT_BUDGET_USD` 已配置，且 Redeploy 为 Ready。变量变更需新部署生效，数据库迁移本身不需要重建应用。
 - 随后正式站发送一条问题：登录、初始化和创建会话均返回 200，消息 HTTP 也为 200，但流的 `done.turn.status=FAILED`，无回答、工具调用或证据。只读已保存轮次确认 `MODEL_ERROR`、`modelCalls=1`，输入／输出用量和 `chargedMicros` 均为 null。HTTP 200 不表示模型回答成功。
 - 未知用量按规则保留 400000 微美元（$0.40）预算预留，该金额不是已确认的实际费用。当前等待 Vercel `assistant_run_failed` 日志的 `name/status/code` 定位原因，不重试、不清账本；真实问答、流、保存、平台时限和页面验收仍未通过。
+- 已补充服务端诊断代码：当前 LangChain 中间件把供应商错误放入 `cause`，旧日志只读外层可能丢失状态码。新日志限深读取原因链，只记录白名单错误类别、HTTP 状态、供应商／网络错误码、参数名和请求 ID，不输出错误正文、聊天或密钥；HTTP、前端提示和费用规则均未变。此补充尚未部署，按负责人约定只做源码审阅，未运行检查或模型请求。
 
 ## 官方依据
 
