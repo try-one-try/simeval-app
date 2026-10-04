@@ -4,7 +4,7 @@
 
 ## 1. 可调用与待实施
 
-**2026-10-03，接口版本 0.9.0。** 原十四项加五项聊天、四项报告，共 23 项已实现；指派／重开两项保留 planned。报告现改为每任务一份系统报告，与聊天独立；阶段 8 本地手工验收与生产发布尚待完成。
+**2026-10-04，接口版本 0.10.0。** 原十四项加五项聊天、四项报告，共 23 项已实现；指派／重开两项保留 planned。报告现改为每任务一份系统报告，与聊天独立；任务列表和比较基线候选采用展示摘要，完整结果通过详情读取。阶段 8 本地手工验收与生产发布尚待完成。
 
 仅两个预设账号会话有效，旧 ADMIN 返回 401。工程师管理本人任务，评测人员只读任务；服务端拒绝越权写入。回补和人工分类退出当前产品，历史数据库关系保留。
 
@@ -106,6 +106,29 @@ Origin: http://localhost:3000
 
 创建／详情／取消／重试返回完整 Run：ID、名称、配置 ID、状态、时间、Provider、基线／重试来源、错误、异常数，以及模型／数据集／Benchmark 展示名称、创建者和固定任务标记。新增 targetSuccessRate、pendingReviewCount、successRule 和 metrics；完整字段见 OpenAPI 的 Run；创建时 startedAt／finishedAt／errorCode／errorMessage 均为 null、anomalyCount 为 0。
 
+任务列表 `GET /api/evaluation-runs` 返回 `RunSummary[]`，包含列表展示与选择所需字段，分页参数及 `meta` 不变。需要指标、执行配置或错误详情时，按选中的 ID 调用任务详情。待复核数统计未确认或有非空草稿的样本，详情页沿用同一判定。
+
+```json
+{
+  "data": [{
+    "id": "demo-run-candidate",
+    "name": "Warehouse Candidate v2.4",
+    "projectId": "EXAMPLE_PROJECT_ID",
+    "status": "SUCCEEDED",
+    "baselineRunId": "demo-run-baseline",
+    "createdAt": "2026-09-26T10:00:00Z",
+    "modelName": "PickPlace Policy",
+    "modelVersion": "v2.4",
+    "datasetName": "Warehouse Scenes",
+    "datasetVersion": "v3",
+    "createdById": "EXAMPLE_ENGINEER_ID",
+    "isDemoFixture": true,
+    "pendingReviewCount": 2
+  }],
+  "meta": { "requestId": "EXAMPLE_REQUEST_UUID", "page": 1, "pageSize": 6, "total": 10 }
+}
+```
+
 ```json
 {
   "data": {
@@ -148,6 +171,8 @@ Origin: http://localhost:3000
 ## 5. 比较与复核：已可调用
 
 两侧任务必须成功、同项目／数据／Benchmark／Episode／Seed，模型不同。指标再核对单位、方向与样本数；不满足时 delta=null、NOT_COMPARABLE，不把缺失当作零。百分比差使用百分点 pp，例如 81%−76%=+5 pp。总体场景保留 __overall__。
+
+比较响应的 `candidate` 和已选择的 `baseline` 返回完整 Run；`baselines` 下拉候选只返回 `id/name/modelVersion`，例如 `[{"id":"demo-run-baseline","name":"Warehouse Baseline v2.3","modelVersion":"v2.3"}]`。切换选择后重新读取该基线的完整指标，兼容条件与隐藏原引用规则不变。
 
 ~~~http
 ### ENGINEER：同口径比较；省略 baselineRunId 就只读当前结果
@@ -197,7 +222,7 @@ PATCH 返回完整详情，sample.version 是下一次编辑的 expectedVersion�
 
 ## 阶段 8：聊天与报告
 
-这些 JSON 接口仍使用 data/meta.requestId，错误沿用 error.code/message/fieldErrors/requestId，写操作检查 Origin。聊天接口要求登录令牌中的 accessId；报告接口使用普通业务身份校验，不依赖 accessId、sessionId 或 turnId。字段及逐行事件完整定义在 OpenAPI 0.9.0。
+这些 JSON 接口仍使用 data/meta.requestId，错误沿用 error.code/message/fieldErrors/requestId，写操作检查 Origin。聊天接口要求登录令牌中的 accessId；报告接口使用普通业务身份校验，不依赖 accessId、sessionId 或 turnId。字段及逐行事件完整定义在 OpenAPI 0.10.0。
 
 | 方法与路径 | 请求 | 返回／约束 |
 |---|---|---|
@@ -257,3 +282,4 @@ Content-Type: application/json
 
 | 2026-10-03 | 0.8.0 | 登录访问隔离、NDJSON 调查、有限运行和证据模板报告；报告旧 planned 请求由 sessionId/turnId 替代 |
 | 2026-10-03 | 0.9.0 | 报告改为每任务一份系统模板，与聊天独立；生成仅 runId，确认必须 expectedSourceHash，返回增加 updatedAt/sourceHash，移除 output.sourceTurnId；独立总览取消 |
+| 2026-10-04 | 0.10.0 | 任务列表返回 RunSummary；比较 baselines 返回 id/name/modelVersion 摘要。任务详情与实际选中基线仍返回完整 Run；分页、权限及错误结构不变 |

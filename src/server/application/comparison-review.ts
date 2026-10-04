@@ -29,7 +29,7 @@ export const comparisonReviewService={
   async comparison(actor:Actor,id:string,baselineId:string|null,scenarioKey?:string):Promise<ComparisonData> {
     const value=await repository.comparison(actor,id,baselineId,scenarioKey);
     const candidate=runDto(value.candidate), baseline=value.baseline?runDto(value.baseline):null;
-    return {candidate,baseline,baselines:value.baselines.map(runDto),metrics:compareMetrics(metricPoints(value.candidate,scenarioKey),value.baseline?metricPoints(value.baseline,scenarioKey):null,value.evidence),
+    return {candidate,baseline,baselines:value.baselines.map(b=>({id:b.id,name:b.name??`${b.modelVersion.name} ${b.modelVersion.version} Evaluation`,modelVersion:b.modelVersion.version})),metrics:compareMetrics(metricPoints(value.candidate,scenarioKey),value.baseline?metricPoints(value.baseline,scenarioKey):null,value.evidence),
       anomalyCount:candidate.anomalyCount,pendingReviewCount:candidate.pendingReviewCount};
   },
   async list(actor:Actor,input:SampleQuery):Promise<SampleListData> {

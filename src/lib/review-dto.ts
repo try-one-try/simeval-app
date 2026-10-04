@@ -1,7 +1,9 @@
 // 客户端复核契约只包含公开证据、内容与版本；不传账号密钥或数据库实体。
 import type { ComparisonMetric } from "@/domain/comparison-review";
 import type { RunData } from "./evaluation-dto";
-export type ComparisonData = { candidate:RunData; baseline:RunData|null; baselines:RunData[]; metrics:ComparisonMetric[]; anomalyCount:number; pendingReviewCount:number };
+// 基线候选只供下拉选择；真正参与比较的任务仍返回完整详情。
+export type ComparisonBaselineData = Pick<RunData,"id"|"name"|"modelVersion">;
+export type ComparisonData = { candidate:RunData; baseline:RunData|null; baselines:ComparisonBaselineData[]; metrics:ComparisonMetric[]; anomalyCount:number; pendingReviewCount:number };
 export type SampleData = {
   id:string;runId:string;sampleNumber:string;scenarioKey:string;metricKey:string;anomalyType:string;status:string;version:number;
   title:string;logExcerpt:string|null;mediaPath:string|null;conclusion:string|null;draftConclusion:string|null;

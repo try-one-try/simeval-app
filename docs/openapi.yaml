@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: SimEval HTTP API
-  version: 0.9.0
+  version: 0.10.0
   description: 合成数据与模拟执行；23 项业务操作已实现，指派和重开 2 项为 planned。Agent 仅用于聊天调查，每任务维护一份独立系统报告；本地手工验收与生产发布待完成。
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 tags:
@@ -87,7 +87,7 @@ paths:
           $ref: '#/components/responses/Unprocessable'
         500:
           $ref: '#/components/responses/InternalError'
-      description: 过滤软删除；共享列表按创建时间和 ID 倒序，显式选择任务。
+      description: 过滤软删除；共享列表按创建时间和 ID 倒序，显式选择任务。每项返回 RunSummary 展示摘要；完整指标与配置通过任务详情读取。
     post:
       tags:
       - Evaluation
@@ -1490,6 +1490,55 @@ components:
               sampleCount:
                 type: integer
                 minimum: 1
+    RunSummary:
+      type: object
+      description: 任务选择与助手选择使用的列表摘要；完整详情由 GET /api/evaluation-runs/{id} 返回。
+      required:
+      - id
+      - name
+      - projectId
+      - status
+      - baselineRunId
+      - createdAt
+      - modelName
+      - modelVersion
+      - datasetName
+      - datasetVersion
+      - createdById
+      - isDemoFixture
+      - pendingReviewCount
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        projectId:
+          type: string
+        status:
+          $ref: '#/components/schemas/RunStatus'
+        baselineRunId:
+          type:
+          - string
+          - 'null'
+        createdAt:
+          type: string
+          format: date-time
+        modelName:
+          type: string
+        modelVersion:
+          type: string
+        datasetName:
+          type: string
+        datasetVersion:
+          type: string
+        createdById:
+          type: string
+        isDemoFixture:
+          type: boolean
+        pendingReviewCount:
+          type: integer
+          minimum: 0
+          description: 状态未确认或有非空草稿的样本数，由数据库统计。
     RunEnvelope:
       type: object
       required:
@@ -1509,7 +1558,7 @@ components:
         data:
           type: array
           items:
-            $ref: '#/components/schemas/Run'
+            $ref: '#/components/schemas/RunSummary'
         meta:
           $ref: '#/components/schemas/PageMeta'
     RunStatusEnvelope:
@@ -2379,6 +2428,20 @@ components:
         evidenceCount:
           type: integer
           minimum: 0
+    ComparisonBaseline:
+      type: object
+      description: 基线下拉候选的展示摘要；实际选中的 baseline 返回完整 Run。
+      required:
+      - id
+      - name
+      - modelVersion
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        modelVersion:
+          type: string
     ComparisonData:
       type: object
       required:
@@ -2398,7 +2461,7 @@ components:
         baselines:
           type: array
           items:
-            $ref: '#/components/schemas/Run'
+            $ref: '#/components/schemas/ComparisonBaseline'
         metrics:
           type: array
           items:

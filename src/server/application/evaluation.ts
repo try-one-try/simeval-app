@@ -1,10 +1,22 @@
 // 应用层把仓储实体整理为公开 DTO；读操作不推进任务状态。
 import "server-only";
-import { evaluationRepository, type StoredRun } from "@/server/repositories/evaluation-repository";
+import { evaluationRepository, type StoredRun, type StoredRunSummary } from "@/server/repositories/evaluation-repository";
 import { AppError, assertRole, isActive, type Actor, type CreateRunInput } from "@/domain/evaluation";
-import type { RunData, QualityData, EvaluationOptions } from "@/lib/evaluation-dto";
+import type { RunData, RunSummaryData, QualityData, EvaluationOptions } from "@/lib/evaluation-dto";
 import { ACTIVE_TASK_LIMIT, benchmarks, models, metricCatalog, snapshotSchema } from "@/domain/evaluation-catalog";
 const readers = ["ENGINEER", "REVIEWER", "ADMIN"] as const;
+// 列表有独立的返回类型，避免用空指标冒充完整任务详情。
+function runSummaryDto(run: StoredRunSummary): RunSummaryData {
+  return {
+    id: run.id, name: run.name ?? `${run.modelVersion.name} ${run.modelVersion.version} Evaluation`,
+    projectId: run.projectId, status: run.status, baselineRunId: run.baselineRunId,
+    createdAt: run.createdAt.toISOString(), createdById: run.createdById, isDemoFixture: run.isDemoFixture,
+    modelName: run.modelVersion.name, modelVersion: run.modelVersion.version,
+    datasetName: run.datasetVersion.name, datasetVersion: run.datasetVersion.version,
+    // 这次查询的 anomalies 计数已在仓储里限定为待复核，不是全部异常数。
+    pendingReviewCount: run._count.anomalies,
+  };
+}
 export function runDto(run: StoredRun): RunData {
   return { id: run.id, name: run.name ?? `${run.modelVersion.name} ${run.modelVersion.version} Evaluation`,
     projectId: run.projectId, status: run.status, modelVersionId: run.modelVersionId, datasetVersionId: run.datasetVersionId,
@@ -53,7 +65,7 @@ export const evaluationService = {
   async list(actor: Actor, input: Parameters<typeof evaluationRepository.list>[0]) {
     assertRole(actor, readers);
     const result = await evaluationRepository.list(input);
-    return { data: result.runs.map(runDto), total: result.total };
+    return { data: result.runs.map(runSummaryDto), total: result.total };
   },
   async create(actor: Actor, input: CreateRunInput, key: string) {
     const result = await evaluationRepository.create(actor, input, key);

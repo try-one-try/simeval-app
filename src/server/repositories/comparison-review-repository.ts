@@ -3,13 +3,15 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
 import { getDb } from "@/server/db";
-import { includeRun } from "./evaluation-repository";
+import { evaluationRepository, includeRun } from "./evaluation-repository";
 import { AppError, assertRole, type Actor } from "@/domain/evaluation";
 import { assertComparable, assertReview, type ReviewInput, type SampleQuery } from "@/domain/comparison-review";
 export const includeSample = { draftUpdatedBy:{select:{id:true,name:true,role:true}}, confirmedBy:{select:{id:true,name:true,role:true}} } as const;
 export type StoredSample = Prisma.AnomalySampleGetPayload<{include:typeof includeSample}>;
+// 下拉候选不读取指标或异常；模型名称只用于没有任务名称的历史记录。
+const selectBaselineOption = { id:true, name:true, modelVersion:{select:{name:true,version:true}} } as const;
 async function run(id:string) {
-  const value=await getDb().evaluationRun.findFirst({where:{id,deletedAt:null},include:includeRun});
+  const value=await evaluationRepository.get(id);
   if(!value) throw new AppError("NOT_FOUND","评测任务不存在",404);
   if(value.status!=="SUCCEEDED") throw new AppError("STATE_CONFLICT","评测完成后才能查看指标与证据",409);
   return value;
@@ -19,14 +21,14 @@ export const comparisonReviewRepository = {
   async comparison(actor:Actor,id:string,baselineId:string|null,scenarioKey?:string) {
     assertRole(actor,["ENGINEER"]);
     const candidate=await run(id);
-    const baseline=baselineId ? await getDb().evaluationRun.findFirst({where:{id:baselineId,...(candidate.baselineRunId===baselineId?{}:{deletedAt:null})},include:includeRun}):null;
-    if(baselineId && !baseline) throw new AppError("NOT_FOUND","比较基线不存在或已隐藏",404);
-    if(baseline) assertComparable(candidate,baseline);
-    const [baselines,evidence]=await Promise.all([
+    const [baseline,baselines,evidence]=await Promise.all([
+      baselineId ? getDb().evaluationRun.findFirst({where:{id:baselineId,...(candidate.baselineRunId===baselineId?{}:{deletedAt:null})},include:includeRun}):null,
       getDb().evaluationRun.findMany({where:{deletedAt:null,status:"SUCCEEDED",projectId:candidate.projectId,datasetVersionId:candidate.datasetVersionId,benchmarkId:candidate.benchmarkId,
-        episodeCount:candidate.episodeCount,simulationSeed:candidate.simulationSeed,modelVersionId:{not:candidate.modelVersionId}},include:includeRun,orderBy:[{createdAt:"desc"},{id:"desc"}]}),
+        episodeCount:candidate.episodeCount,simulationSeed:candidate.simulationSeed,modelVersionId:{not:candidate.modelVersionId}},select:selectBaselineOption,orderBy:[{createdAt:"desc"},{id:"desc"}]}),
       getDb().anomalySample.findMany({where:{runId:id,...(scenarioKey?{scenarioKey}:{})},select:{metricKey:true,scenarioKey:true}}),
     ]);
+    if(baselineId && !baseline) throw new AppError("NOT_FOUND","比较基线不存在或已隐藏",404);
+    if(baseline) assertComparable(candidate,baseline);
     return {candidate,baseline,baselines,evidence};
   },
   async list(actor:Actor,input:SampleQuery) {

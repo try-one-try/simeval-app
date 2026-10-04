@@ -17,7 +17,7 @@ export function AccessLoginForm({ initialRole, initialError }: { initialRole: De
     <div className="access-password-field">
       <label htmlFor="access-password">访问密码</label>
       <div className="access-password-control">
-        <input id="access-password" name="accessPassword" type={passwordVisible ? "text" : "password"} placeholder="请输入访问密码" autoComplete="current-password" maxLength={256} required aria-invalid={invalidPassword} aria-describedby="access-password-help" />
+        <input id="access-password" name="accessPassword" type={passwordVisible ? "text" : "password"} autoComplete="current-password" maxLength={256} required aria-invalid={invalidPassword} aria-describedby="access-password-help" />
         <button className="access-password-visibility" type="button" aria-label={passwordVisible ? "隐藏访问密码" : "显示访问密码"} aria-pressed={passwordVisible} onClick={() => setPasswordVisible((visible) => !visible)}>
           {passwordVisible ? <EyeOff size={18} aria-hidden="true" /> : <Eye size={18} aria-hidden="true" />}
         </button>

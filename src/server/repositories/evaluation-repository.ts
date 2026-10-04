@@ -1,6 +1,7 @@
 // 所有评测写入集中在事务仓储：门禁、条件更新、唯一约束与审计共同保护持久化。
 import "server-only";
 import { createHash, randomUUID } from "node:crypto";
+import { cache } from "react";
 import { getDb } from "@/server/db";
 import { Prisma } from "@/generated/prisma/client";
 import { AppError, assertRole, assertQuality, assertConfiguration, assertMutable, type Actor, type CreateRunInput } from "@/domain/evaluation";
@@ -8,6 +9,18 @@ import { evaluationProvider, MOCK_EXECUTION_TIMING } from "@/server/providers/ev
 import { ACTIVE_TASK_LIMIT, configurationProfile, snapshotSchema, type SimulationSnapshot } from "@/domain/evaluation-catalog";
 type Tx = Prisma.TransactionClient;
 export const includeRun = { modelVersion: true, datasetVersion: true, benchmark: true, metricResults: { include: { metricDefinition: true } }, anomalies: { select: { status: true, draftConclusion: true } }, _count: { select: { anomalies: true } } } as const;
+// 列表只取展示字段；数据库直接统计待复核数，不把指标和每条草稿搬回应用。
+const selectRunSummary = {
+  id: true, name: true, projectId: true, status: true, baselineRunId: true,
+  createdAt: true, createdById: true, isDemoFixture: true,
+  modelVersion: { select: { name: true, version: true } },
+  datasetVersion: { select: { name: true, version: true } },
+  _count: { select: { anomalies: { where: { OR: [
+    { status: { not: "RESOLVED" } },
+    // 和现有待复核规则一致：已确认但有非空草稿的样本，也需要再次复核。
+    { AND: [{ draftConclusion: { not: null } }, { draftConclusion: { not: "" } }] },
+  ] } } } },
+} satisfies Prisma.EvaluationRunSelect;
 function hash(value: unknown) { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
 function storageKey(operation: string, key: string) { return operation + ":" + hash(key); }
 function codeOf(error: unknown) { return typeof error === "object" && error !== null && "code" in error ? String(error.code) : ""; }
@@ -77,13 +90,14 @@ export const evaluationRepository = {
     return { project, recent };
   },
   quality(id: string) { return getDb().datasetVersion.findUnique({ where: { id }, include: { checks: { orderBy: { checkKey: "asc" } } } }); },
-  get(id: string) { return getDb().evaluationRun.findFirst({ where: { id, deletedAt: null }, include: includeRun }); },
+  // React 只在本次页面请求内去重；HTTP 读取和事务写入仍查询当前数据库。
+  get: cache(async (id: string) => getDb().evaluationRun.findFirst({ where: { id, deletedAt: null }, include: includeRun })),
   async list(input: { page: number; pageSize: number; status?: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED" | "CANCELLED"; projectId?: string }) {
     const where = { status: input.status, projectId: input.projectId, deletedAt: null };
-    const [runs, total] = await getDb().$transaction([
-      getDb().evaluationRun.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (input.page - 1) * input.pageSize, take: input.pageSize, include: includeRun }),
-      getDb().evaluationRun.count({ where }),
-    ]);
+    // 这里只读列表，不需要事务的 BEGIN／COMMIT 往返。
+    // 两次读取依次复用已有连接，避免首次切页为并发 count 再等一次远程握手。
+    const runs = await getDb().evaluationRun.findMany({ where, orderBy: [{ createdAt: "desc" }, { id: "desc" }], skip: (input.page - 1) * input.pageSize, take: input.pageSize, select: selectRunSummary });
+    const total = await getDb().evaluationRun.count({ where });
     return { runs, total };
   },
   async create(actor: Actor, input: CreateRunInput, key: string) {
@@ -167,3 +181,4 @@ export const evaluationRepository = {
   },
 };
 export type StoredRun = NonNullable<Awaited<ReturnType<typeof evaluationRepository.get>>>;
+export type StoredRunSummary = Prisma.EvaluationRunGetPayload<{ select: typeof selectRunSummary }>;

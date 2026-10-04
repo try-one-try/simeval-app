@@ -9,7 +9,7 @@ import { Conversation } from "./conversation";
 import { assistantRequest } from "./api-client";
 import { assistantContent as content } from "./content";
 import type { SessionView, TurnView } from "@/domain/assistant";
-import type { RunData } from "@/lib/evaluation-dto";
+import type { RunData, RunSummaryData } from "@/lib/evaluation-dto";
 import type { DemoRole } from "@/lib/demo-identity";
 import styles from "./assistant.module.css";
 
@@ -18,7 +18,7 @@ export default function AssistantPanel({ opened, onClose, role, onActivity }: { 
   const dialog = useRef<HTMLDialogElement>(null);
   const [expanded, setExpanded] = useState(false), [busy, setBusy] = useState(false), [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [sessions, setSessions] = useState<SessionView[]>([]), [conversation, setConversation] = useState<ConversationData | null>(null), [showHistory, setShowHistory] = useState(false);
-  const [runs, setRuns] = useState<RunData[]>([]), [chosenRun, setChosenRun] = useState("");
+  const [runs, setRuns] = useState<RunSummaryData[]>([]), [chosenRun, setChosenRun] = useState("");
   const pathname = usePathname(), params = useSearchParams();
   const pathRun = /^\/evaluations\/([^/]+)$/.exec(pathname)?.[1];
   const pageRunId = params.get("runId") || (pathRun && pathRun !== "new" ? pathRun : null);
@@ -39,7 +39,7 @@ export default function AssistantPanel({ opened, onClose, role, onActivity }: { 
   }, [opened, expanded]);
   useEffect(() => {
     const abort = new AbortController();
-    void Promise.all([assistantRequest<SessionView[]>("/api/assistant/sessions", undefined, abort.signal), assistantRequest<RunData[]>("/api/evaluation-runs?status=SUCCEEDED&pageSize=100", undefined, abort.signal)])
+    void Promise.all([assistantRequest<SessionView[]>("/api/assistant/sessions", undefined, abort.signal), assistantRequest<RunSummaryData[]>("/api/evaluation-runs?status=SUCCEEDED&pageSize=100", undefined, abort.signal)])
       .then(async ([history, tasks]) => { setSessions(history); setRuns(tasks); if (history[0]) setConversation(await assistantRequest<ConversationData>(`/api/assistant/sessions/${history[0].id}`, undefined, abort.signal)); })
       .catch(e => { if (!abort.signal.aborted) setError(e instanceof Error ? e.message : "助手加载失败"); })
       .finally(() => { if (!abort.signal.aborted) setLoading(false); });

@@ -12,6 +12,12 @@ export type RunData = {
   targetSuccessRate: number | null; pendingReviewCount: number; successRule: string;
   metrics: { key: string; name: string; unit: string; scenarioKey: string; value: number; sampleCount: number }[];
 };
+// 任务选择只需这些展示信息；进入详情后再读取指标、配置和异常证据。
+export type RunSummaryData = Pick<RunData,
+  "id" | "name" | "projectId" | "status" | "baselineRunId" | "createdAt" |
+  "modelName" | "modelVersion" | "datasetName" | "datasetVersion" |
+  "createdById" | "isDemoFixture" | "pendingReviewCount"
+>;
 export type QualityData = {
   dataset: { id: string; name: string; version: string; sampleCount: number; qualityStatus: "PASSED" | "WARNING" | "FAILED" };
   checks: { key: string; name: string; status: "PASSED" | "WARNING" | "FAILED"; affectedCount: number; message: string }[];

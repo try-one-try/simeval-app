@@ -5,7 +5,7 @@ import { getDb } from "@/server/db";
 import { AppError, assertRole, type Actor } from "@/domain/evaluation";
 import { reportOutputSchema, type ReportView } from "@/domain/assistant";
 import { jsonValue, sourceSnapshot, snapshotHash } from "./evaluation-snapshot";
-import { includeRun } from "./evaluation-repository";
+import { evaluationRepository, includeRun } from "./evaluation-repository";
 import type { AIReport, Prisma } from "@/generated/prisma/client";
 
 const provider = "system-evidence-v1";
@@ -27,9 +27,11 @@ async function lockRun(tx: Prisma.TransactionClient, id: string) {
 export const reportRepository = {
   async list(actor: Actor, runId: string) {
     assertRole(actor, ["ENGINEER", "REVIEWER"]);
-    const run = await getDb().evaluationRun.findFirst({ where: { id: runId, deletedAt: null, status: "SUCCEEDED" }, select: { id: true } });
-    if (!run) throw new AppError("NOT_FOUND", "评测结果不存在", 404);
-    const report = await getDb().aIReport.findUnique({ where: { currentForRunId: runId } });
+    const [run, report] = await Promise.all([
+      evaluationRepository.get(runId),
+      getDb().aIReport.findUnique({ where: { currentForRunId: runId } }),
+    ]);
+    if (!run || run.status !== "SUCCEEDED") throw new AppError("NOT_FOUND", "评测结果不存在", 404);
     if (!report) return [];
     const current = await sourceSnapshot(getDb(), runId, null);
     return [view({ ...report, isStale: report.isStale || current.hash !== snapshotHash(report.inputSnapshot) })];
