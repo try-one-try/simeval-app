@@ -1,5 +1,6 @@
 // 实际 HTTP 边界测试：身份、同源、JSON、参数与错误契约。
 import { beforeEach, expect, it, vi } from "vitest";
+import { AppError } from "@/domain/evaluation";
 vi.mock("server-only",()=>({}));
 const mocks=vi.hoisted(()=>({auth:vi.fn(),user:vi.fn(),create:vi.fn(),list:vi.fn(),get:vi.fn(),remove:vi.fn(),options:vi.fn()}));
 vi.mock("@/auth",()=>({auth:mocks.auth}));
@@ -46,6 +47,13 @@ it("首次创建 201，幂等重放 200，并把请求号传到审计上下文",
   const payload=await response.json();expect(payload.meta.requestId).toBeTruthy();
   expect(mocks.create.mock.calls[0][0].requestId).toBe(payload.meta.requestId);
   mocks.create.mockResolvedValue({data:{id:"created"},replay:true});expect((await POST(request())).status).toBe(200);
+});
+it("任务重名返回 409、名称字段反馈与请求号",async()=>{
+  const message="已存在同名任务，请换一个任务名称";
+  mocks.create.mockRejectedValue(new AppError("RUN_NAME_CONFLICT",message,409,{name:[message]}));
+  const response=await POST(request());expect(response.status).toBe(409);
+  const payload=await response.json();
+  expect(payload.error).toMatchObject({code:"RUN_NAME_CONFLICT",message,fieldErrors:{name:[message]},requestId:expect.any(String)});
 });
 it("分页参数校验并返回 meta",async()=>{
   expect((await GET(new Request("http://localhost:3000/api/evaluation-runs?page=0"))).status).toBe(422);

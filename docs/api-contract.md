@@ -4,7 +4,7 @@
 
 ## 1. 可调用与待实施
 
-**2026-10-04，接口版本 0.10.0。** 原十四项加五项聊天、四项报告，共 23 项已实现；指派／重开两项保留 planned。报告现改为每任务一份系统报告，与聊天独立；任务列表和比较基线候选采用展示摘要，完整结果通过详情读取。阶段 8 本地手工验收与生产发布尚待完成。
+**接口版本 0.10.0。** 当前有 23 项业务操作：14 项评测与复核、5 项聊天、4 项报告。指派和重新打开样本仍标为 planned。报告与聊天独立，每个任务最多一份当前系统报告。完整的人读接口说明、数据格式与架构统一见[架构与接口](架构与接口.md)；本文保留可执行请求示例。
 
 仅两个预设账号会话有效，旧 ADMIN 返回 401。工程师管理本人任务，评测人员只读任务；服务端拒绝越权写入。回补和人工分类退出当前产品，历史数据库关系保留。
 
@@ -12,20 +12,21 @@
 
 - **身份与写入**：校验 Session、预设账号 email／isDemo 和数据库角色；写入要求同源 Origin、Zod 与业务权限。POST／PATCH／DELETE 都校验 Origin。
 - **输入与分页**：ID 长 1–64，仅字母／数字／下划线／连字符；Body 拒绝多余字段。任务名 trim 后 1–120 字，Episode 1–10000，Seed 0–2147483647；目录另收紧 Episode。page 从 1，pageSize 默认 20／最多 100，任务按时间倒序＋ID 排序；异常按 sampleNumber＋ID 升序。
+- **任务防重名**：同项目所有未软删除任务名须唯一，包含固定示例和其他创建者；新旧名称都 `trim().toLowerCase()` 后比较，已软删除名称可复用。创建重名返回 `409 RUN_NAME_CONFLICT` 与 `fieldErrors.name`；界面保留全部输入，回到配置步骤修改名称。本次不自动修改历史名称。
 - **响应**：成功 `{data,meta:{requestId}}`；错误 `{error:{code,message,fieldErrors,requestId}}`。fieldErrors 为字段消息数组映射或 null；不泄漏 SQL、密码或堆栈。
 - **身份显示**：复核中的编辑者、确认人和历史操作者 `name` 使用“算法工程师”“评测人员”等角色名称，不使用旧账号昵称；`id` 与原记录关联不变。
-- **幂等**：创建／重试带 1–128 字符 Idempotency-Key；聊天用正文 requestKey UUID。同用户／操作／键及内容重复返回原对象；同键换内容 409。创建首次 201，重复 200。报告不收幂等头：按任务唯一键维护一份，来源未变化时返回原报告，变化时更新同一 ID。
+- **幂等**：创建／重试带 1–128 字符 Idempotency-Key；聊天用正文 requestKey UUID。同用户／操作／键及内容重复返回原对象；同键换内容 409。创建首次 201，重复 200；重放优先返回原任务，不因已有名称误报重名，重试请求摘要不含动态编号。报告不收幂等头：按任务唯一键维护一份，来源未变化时返回原报告，变化时更新同一 ID。
 - **四个标识**：requestId 跟踪一次请求；runId 定位任务；幂等键识别重复动作；expectedVersion 防止编辑覆盖。
 
 ## 3. 当前状态与模拟逻辑
 
 PASSED 可创建，WARNING 明确接受，FAILED 阻断。基线可不选；选了才要求成功、同项目／数据／Benchmark／Episode／Seed、不同模型版本且未隐藏。可选 targetSuccessRate 为 0.8／0.85；这是达标目标，不参与指标计算。
 
-创建保存 QUEUED；POST sync 创建后满 1 秒可进入 RUNNING、满 4 秒可完成，每次推进一段，无后台执行。GET 始终只读，运行中 progress 为 null。Mock 按创建时配置快照、模型参数、数据／基准难度、Seed 与 Episode 生成四项指标和两条预置 OPEN 证据片段，结果／终态／审计同事务提交，不代表执行真实 Episode。
+创建保存 QUEUED；POST sync 创建后满 1 秒可进入 RUNNING、满 4 秒可完成，每次推进一段，无后台执行。评测 GET 不推进任务，运行中 progress 为 null。Mock 按创建时配置快照、模型参数、数据／基准难度、Seed 与 Episode 生成四项指标和两条预置 OPEN 证据片段，结果／终态／审计同事务提交，不代表执行真实 Episode。助手详情读取另有超时登记逻辑，不能把所有 GET 都视为无写入。
 
-QUEUED／RUNNING 可取消，完成竞争返回最新状态或 409；FAILED 重试新 ID 并保留 retryOfRunId。重试重新检查配置／质量，沿用审计中的真实警告接受；未接受的新 WARNING 返回 422。mockFailure 是故障展示，重试默认清除。
+QUEUED／RUNNING 可取消；任务已经完成或状态竞争时返回 409。FAILED 重试新 ID 并保留 retryOfRunId。重试名称自动为“原名 · 重试 N”，从 1 起选同项目未占用编号，必要时截短原名保证含后缀总长不超过 120 字；重复幂等请求仍返回原 ID 与原名称。重试重新检查配置／质量，沿用审计中的真实警告接受；未接受的新 WARNING 返回 422。mockFailure 是故障展示，重试默认清除。
 
-每个工程师最多同时有 3 个 QUEUED／RUNNING 任务；先锁账号行，再查幂等与容量。终态释放名额。软删除只允许本人终态、保护预置示例；列表和详情隐藏，被已有任务引用的指标仍保留，重复删除只写一次审计。
+每个工程师最多同时有 3 个 QUEUED／RUNNING 任务；先锁账号行，再查幂等与容量。创建／重试沿用 Serializable 事务，实际新建时还锁项目行，只读取该项目未软删除任务的名称并完成判重或编号分配，保护不同账号的并发创建。无需新增 Schema／迁移。终态释放名额。软删除只允许本人终态、保护预置示例；列表和详情隐藏，被已有任务引用的指标仍保留，重复删除只写一次审计。
 
 ## 4. 可执行请求示例
 
@@ -102,6 +103,8 @@ Origin: http://localhost:3000
 
 ### 代表性成功响应
 
+示例中的首次创建须使用未占用名称；同键同内容重放返回原任务。保留创建正文、只换一个新幂等键再次提交则返回重名 409。FAILED 任务的重试响应包含自动生成的名称，例如 `Warehouse Manipulation Evaluation v2.4 · 重试 1`；编号已占用时继续寻找下一个。
+
 质量报告的 dataset 为 `Warehouse Scenes v3`、sampleCount 2400、qualityStatus WARNING；检查含 name 和 message，遮挡场景分布 affectedCount 18。18 是质量统计，2 是每个完成任务实际保存的异常数。
 
 创建／详情／取消／重试返回完整 Run：ID、名称、配置 ID、状态、时间、Provider、基线／重试来源、错误、异常数，以及模型／数据集／Benchmark 展示名称、创建者和固定任务标记。新增 targetSuccessRate、pendingReviewCount、successRule 和 metrics；完整字段见 OpenAPI 的 Run；创建时 startedAt／finishedAt／errorCode／errorMessage 均为 null、anomalyCount 为 0。
@@ -145,6 +148,19 @@ Origin: http://localhost:3000
 
 ### 代表性错误响应
 
+同项目重名时返回 HTTP 409；例如已有 `Warehouse Manipulation Evaluation v2.4`，提交 ` warehouse manipulation evaluation v2.4 ` 也算重名：
+
+```json
+{
+  "error": {
+    "code": "RUN_NAME_CONFLICT",
+    "message": "已存在同名任务，请换一个任务名称",
+    "fieldErrors": { "name": ["已存在同名任务，请换一个任务名称"] },
+    "requestId": "EXAMPLE_REQUEST_UUID"
+  }
+}
+```
+
 ```json
 {
   "error": {
@@ -161,7 +177,7 @@ Origin: http://localhost:3000
 | 401 | UNAUTHENTICATED | 会话无效 |
 | 403 | FORBIDDEN | 角色、任务归属或 Origin 不满足 |
 | 404 | NOT_FOUND | 对象不存在 |
-| 409 | IDEMPOTENCY_CONFLICT／STATE_CONFLICT／TASK_LIMIT_REACHED／VERSION_CONFLICT | 重复键内容不同、状态不允许、容量已满或结论版本已更新 |
+| 409 | IDEMPOTENCY_CONFLICT／STATE_CONFLICT／TASK_LIMIT_REACHED／RUN_NAME_CONFLICT／VERSION_CONFLICT | 重复键内容不同、状态不允许、容量已满、同项目重名或结论版本已更新；重名提供 fieldErrors.name |
 | 422 | VALIDATION_ERROR | 结构、路径、分页、字段或请求头不合法 |
 | 422 | QUALITY_WARNING_NOT_ACCEPTED／DATASET_QUALITY_BLOCKED | 未确认警告或质量阻断 |
 | 422 | INCOMPATIBLE_CONFIGURATION | 非同项目、非同口径或基线缺结果 |
@@ -283,3 +299,4 @@ Content-Type: application/json
 | 2026-10-03 | 0.8.0 | 登录访问隔离、NDJSON 调查、有限运行和证据模板报告；报告旧 planned 请求由 sessionId/turnId 替代 |
 | 2026-10-03 | 0.9.0 | 报告改为每任务一份系统模板，与聊天独立；生成仅 runId，确认必须 expectedSourceHash，返回增加 updatedAt/sourceHash，移除 output.sourceTurnId；独立总览取消 |
 | 2026-10-04 | 0.10.0 | 任务列表返回 RunSummary；比较 baselines 返回 id/name/modelVersion 摘要。任务详情与实际选中基线仍返回完整 Run；分页、权限及错误结构不变 |
+| 2026-10-05 | 0.10.0 错误扩展 | 同项目未删除任务名 trim 后不区分大小写，创建重名返回 RUN_NAME_CONFLICT 与 fieldErrors.name；重试自动编号、幂等重放返回原任务。成功字段不变，无新增迁移；本轮按负责人约定未运行检查或浏览器验收 |

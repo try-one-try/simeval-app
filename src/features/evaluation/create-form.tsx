@@ -1,8 +1,8 @@
 "use client";
-// 两步创建保留同一份输入；服务端复查权限、质量、兼容性和任务容量。
+// 两步创建保留同一份输入；服务端复查权限、质量、兼容性、任务名和容量。
 import { useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
-import type { Actor } from "@/domain/evaluation";
+import { RUN_NAME_MAX_LENGTH, type Actor } from "@/domain/evaluation";
 import { configurationProfile, CUSTOM_DEMO_RUN_NAME } from "@/domain/evaluation-catalog";
 import type { EvaluationOptions, QualityData, RunData } from "@/lib/evaluation-dto";
 import { apiRequest, ClientError, errorText } from "@/lib/api-client";
@@ -25,6 +25,7 @@ export function CreateForm({ options, actor }: { options: EvaluationOptions; act
   const [fields, setFields] = useState<Record<string, string[]>>({});
   const submission = useRef<{ body: string; key: string } | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
+  const nameInput = useRef<HTMLInputElement>(null);
   const benchmark = options.benchmarks.find(b => b.id === benchmarkId);
   const profile = configurationProfile(modelId, datasetId, benchmarkId);
   const compatibleBaselines = options.baselines.filter(b => b.datasetVersionId === datasetId && b.benchmarkId === benchmarkId && b.modelVersionId !== modelId && b.episodeCount === episodes && b.simulationSeed === seed);
@@ -34,7 +35,7 @@ export function CreateForm({ options, actor }: { options: EvaluationOptions; act
   function demo() {
     setName(CUSTOM_DEMO_RUN_NAME); setModelId("demo-model-candidate"); setDatasetId("demo-dataset-scenes-v3");
     setBenchmarkId("demo-benchmark-v1"); setEpisodes(200); setSeed(20260901);
-    setTarget("0.8"); setBaselineId(""); setAccepted(false); setQuality(null); setError("");
+    setTarget("0.8"); setBaselineId(""); setAccepted(false); setQuality(null); setError(""); setFields({});
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -52,7 +53,17 @@ export function CreateForm({ options, actor }: { options: EvaluationOptions; act
         router.push("/evaluations/" + run.id);
         return;
       }
-    } catch (failure) { setError(errorText(failure)); if (failure instanceof ClientError) setFields(failure.fieldErrors ?? {}); }
+    } catch (failure) {
+      setError(errorText(failure));
+      if (failure instanceof ClientError) {
+        setFields(failure.fieldErrors ?? {});
+        if (failure.fieldErrors?.name?.length) {
+          // 名称在第一步：保留其他配置，回到这里改名，再重新确认质量。
+          setStep(1); setAccepted(false);
+          requestAnimationFrame(() => nameInput.current?.focus());
+        }
+      }
+    }
     setBusy(false);
   }
   return <section className="content workflow-content create-view">
@@ -62,7 +73,10 @@ export function CreateForm({ options, actor }: { options: EvaluationOptions; act
     <form onSubmit={submit}>
       {step === 1 ? <>
         <div className="evaluation-fields">
-          <label className="task-name-field">任务名称 · 必填<input name="name" value={name} maxLength={120} required disabled={busy} placeholder="请输入任务名称" onChange={e => setName(e.target.value)} /><span className="fine-print">用场景和目的命名，1–120 字。</span></label>
+          <label className="task-name-field">任务名称 · 必填<input ref={nameInput} name="name" value={name} maxLength={RUN_NAME_MAX_LENGTH} required disabled={busy} placeholder="请输入任务名称" aria-invalid={!!fields.name?.length} aria-describedby={fields.name?.length ? "task-name-hint task-name-error" : "task-name-hint"} onChange={e => {
+            setName(e.target.value); setError("");
+            setFields(current => { const next = { ...current }; delete next.name; return next; });
+          }} /><span id="task-name-hint" className="fine-print">用场景和目的命名，1–120 字；同项目不可重名。</span>{!!fields.name?.length && <span id="task-name-error" className="risk-text">{fields.name.join("；")}</span>}</label>
           <label className="model-field">模型版本<select value={modelId} disabled={busy} required onChange={e => { setModelId(e.target.value); configurationChanged(); }}><option value="">请选择模型版本</option>{options.models.map(m => <option key={m.id} value={m.id}>{m.name} {m.version}</option>)}</select><span className="fine-print">选择要测试的候选模型</span></label>
           <div className="readonly-field success-rule-field"><span>成功判定规则</span><p>{benchmark?.successRule ?? "选择 Benchmark 后查看成功规则"}</p></div>
           <label className="dataset-field">数据集版本<select value={datasetId} disabled={busy} required onChange={e => { setDatasetId(e.target.value); configurationChanged(); }}><option value="">请选择数据集版本</option>{options.datasets.map(({ dataset: d }) => <option key={d.id} value={d.id}>{d.name} {d.version} · {d.qualityStatus}</option>)}</select><span className="fine-print">合成样本；质量确认在下一步</span></label>
@@ -84,7 +98,7 @@ export function CreateForm({ options, actor }: { options: EvaluationOptions; act
         {quality.dataset.qualityStatus === "WARNING" && <label className="warning-consent"><input type="checkbox" checked={accepted} disabled={busy} onChange={e => setAccepted(e.target.checked)} />我已了解这些质量警告，仍继续本次模拟评测。</label>}
         <details className="advanced-settings"><summary>本次配置</summary><p>{options.models.find(m => m.id === modelId)?.name} {options.models.find(m => m.id === modelId)?.version} · {benchmark?.name}</p><p>{episodes} Episodes · Seed {seed} · {baselineId ? "已选择历史基线" : "无比较基线"} · {target ? "目标 " + Number(target) * 100 + "%" : "未设达标目标"}</p></details>
       </>}
-      {error && <div className="request-error" role="alert"><p>{error}</p>{Object.entries(fields).map(([key, values]) => <p key={key}>{values.join("；")}</p>)}</div>}
+      {error && <div className="request-error" role="alert"><p>{error}</p>{Object.entries(fields).filter(([key]) => key !== "name").map(([key, values]) => <p key={key}>{values.join("；")}</p>)}</div>}
       <div className="workflow-actions"><button className="primary-button" type="submit" disabled={busy || (step === 1 ? !valid : !canStart)}>{busy ? (step === 1 ? "正在读取质量…" : "正在创建…") : step === 1 ? "检查数据质量 →" : quality?.dataset.qualityStatus === "FAILED" ? "质量未通过，不能创建" : quality?.dataset.qualityStatus === "WARNING" && !accepted ? "请先接受质量警告" : "创建并启动评测 →"}</button>
         {step === 2 && <button className="text-action" type="button" disabled={busy} onClick={() => { setStep(1); setAccepted(false); setError(""); requestAnimationFrame(() => heading.current?.focus()); }}>返回修改配置 ←</button>}</div>
     </form>

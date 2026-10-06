@@ -18,7 +18,7 @@ describe.skipIf(!testUrl)("对比与复核真实数据库",()=>{
  const reviewer:Actor={id:"demo-user-reviewer",role:"REVIEWER",requestId:"review-integration"};
  const input:CreateRunInput={name:"复核集成测试",modelVersionId:"demo-model-candidate",datasetVersionId:"demo-dataset-scenes-v3",benchmarkId:"demo-benchmark-v1",baselineRunId:"demo-run-baseline",episodeCount:200,simulationSeed:20260901,acceptQualityWarning:true,mockFailure:false};
  async function fixture(){
-  const {run}=await evaluation.create(engineer,input,randomUUID());ids.push(run.id);
+  const {run}=await evaluation.create(engineer,{...input,name:input.name+" "+randomUUID()},randomUUID());ids.push(run.id);
   await evaluation.sync(engineer,run.id,new Date(run.createdAt.getTime()+3000));
   await evaluation.sync(engineer,run.id,new Date(run.createdAt.getTime()+13000));
   const sample=await db.anomalySample.findFirstOrThrow({where:{runId:run.id}});

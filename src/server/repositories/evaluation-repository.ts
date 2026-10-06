@@ -4,7 +4,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { cache } from "react";
 import { getDb } from "@/server/db";
 import { Prisma } from "@/generated/prisma/client";
-import { AppError, assertRole, assertQuality, assertConfiguration, assertMutable, type Actor, type CreateRunInput } from "@/domain/evaluation";
+import { AppError, assertRole, assertQuality, assertConfiguration, assertMutable, resolveRunName, type Actor, type CreateRunInput } from "@/domain/evaluation";
 import { evaluationProvider, MOCK_EXECUTION_TIMING } from "@/server/providers/evaluation-provider";
 import { ACTIVE_TASK_LIMIT, configurationProfile, snapshotSchema, type SimulationSnapshot } from "@/domain/evaluation-catalog";
 type Tx = Prisma.TransactionClient;
@@ -67,10 +67,14 @@ async function createInTransaction(tx: Tx, actor: Actor, input: CreateRunInput, 
   }
   // 重试保留原任务已经拥有的基线引用；新建不能指定隐藏的基线。
   const { model, snapshot } = await checkedConfiguration(tx, input, retryOfRunId !== null);
+  // 先处理幂等重放，再按项目串行查重；不同账号同时提交同名也不能各建一条。
+  await tx.$queryRaw(Prisma.sql`SELECT id FROM "Project" WHERE id = ${model.projectId} FOR UPDATE`);
+  const existingNames = await tx.evaluationRun.findMany({ where: { projectId: model.projectId, deletedAt: null }, select: { name: true } });
+  const name = resolveRunName(input.name, existingNames.map(run => run.name), retryOfRunId !== null);
   const activeCount = await tx.evaluationRun.count({ where: { createdById: actor.id, deletedAt: null, status: { in: ["QUEUED", "RUNNING"] } } });
   if (activeCount >= ACTIVE_TASK_LIMIT) throw new AppError("TASK_LIMIT_REACHED", "最多同时运行 3 个任务，请先查看或取消已有任务", 409);
   const run = await tx.evaluationRun.create({
-    data: { name: input.name, projectId: model.projectId, modelVersionId: input.modelVersionId, datasetVersionId: input.datasetVersionId,
+    data: { name, projectId: model.projectId, modelVersionId: input.modelVersionId, datasetVersionId: input.datasetVersionId,
       benchmarkId: input.benchmarkId, baselineRunId: input.baselineRunId ?? null, targetSuccessRate: input.targetSuccessRate ?? null, configurationSnapshot: snapshot, retryOfRunId, status: "QUEUED", createdById: actor.id,
       provider: "MockEvaluationProvider", episodeCount: input.episodeCount, simulationSeed: input.simulationSeed,
       mockFailure: input.mockFailure, idempotencyKey, requestFingerprint },

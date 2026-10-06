@@ -15,9 +15,10 @@ describe.skipIf(!testUrl)("评测真实数据库事务",()=>{
   let db:ReturnType<typeof import("@/server/db").getDb>;
   const original=process.env.DATABASE_URL;
   const ids:string[]=[];
+  const userIds:string[]=[];
   const actor:Actor={id:"demo-user-engineer",role:"ENGINEER",requestId:"integration-evaluation"};
   const input:CreateRunInput={name:"集成测试任务",modelVersionId:"demo-model-candidate",datasetVersionId:"demo-dataset-scenes-v3",benchmarkId:"demo-benchmark-v1",baselineRunId:"demo-run-baseline",episodeCount:200,simulationSeed:20260901,acceptQualityWarning:true,mockFailure:false};
-  const create=async(change:Partial<CreateRunInput>={})=>{const result=await repository.create(actor,{...input,...change},randomUUID());ids.push(result.run.id);return result.run;};
+  const create=async(change:Partial<CreateRunInput>={})=>{const result=await repository.create(actor,{...input,name:input.name+" "+randomUUID(),...change},randomUUID());ids.push(result.run.id);return result.run;};
   const at=(run:{createdAt:Date},ms:number)=>new Date(run.createdAt.getTime()+ms);
   beforeAll(async()=>{
     if(!testUrl || parseDatabaseUrl(testUrl).database!=="simeval_test" || testUrl===original)throw new Error("必须使用独立 simeval_test");
@@ -39,18 +40,47 @@ describe.skipIf(!testUrl)("评测真实数据库事务",()=>{
         await tx.anomalySample.deleteMany({where:{runId:{in:ids}}});
         await tx.evaluationRun.updateMany({where:{id:{in:ids}},data:{retryOfRunId:null,baselineRunId:null}});
         await tx.evaluationRun.deleteMany({where:{id:{in:ids}}});
+        await tx.user.deleteMany({where:{id:{in:userIds}}});
       });
       await db.$disconnect();
     }
     if(original===undefined)delete process.env.DATABASE_URL;else process.env.DATABASE_URL=original;
   });
-  it("并发同键只创建一次，同键不同输入冲突",async()=>{
+  it("并发同键只创建一次，已有同名任务仍先幂等重放，同键不同输入冲突",async()=>{
     const key=randomUUID();
-    const results=await Promise.all([repository.create(actor,input,key),repository.create(actor,input,key)]);
+    const requestInput={...input,name:input.name+" "+randomUUID()};
+    const results=await Promise.all([repository.create(actor,requestInput,key),repository.create(actor,requestInput,key)]);
     ids.push(results[0].run.id);expect(results[0].run.id).toBe(results[1].run.id);
     expect(results.filter((result)=>!result.replay)).toHaveLength(1);
-    await expect(repository.create(actor,{...input,name:"不同输入"},key)).rejects.toMatchObject({status:409});
+    const replay=await repository.create(actor,requestInput,key);expect(replay.replay).toBe(true);expect(replay.run.id).toBe(results[0].run.id);
+    await expect(repository.create(actor,{...requestInput,name:"不同输入"},key)).rejects.toMatchObject({code:"IDEMPOTENCY_CONFLICT",status:409});
     expect(await db.auditLog.count({where:{entityId:results[0].run.id,action:"EVALUATION_CREATED"}})).toBe(1);
+  });
+  it("同项目名称去两端空格且不区分大小写，取消仍占名称，软删除后可复用",async()=>{
+    const name="Name Check "+randomUUID();
+    const run=await create({name:"  "+name+"  ",baselineRunId:null});expect(run.name).toBe(name);
+    await repository.cancel(actor,run.id);
+    await expect(create({name:"\t"+name.toUpperCase()+"\n",baselineRunId:null})).rejects.toMatchObject({
+      code:"RUN_NAME_CONFLICT",status:409,fieldErrors:{name:[expect.any(String)]},
+    });
+    await repository.remove(actor,run.id);
+    const replacement=await create({name:name.toLowerCase(),baselineRunId:null});
+    expect(replacement.name).toBe(name.toLowerCase());expect(replacement.id).not.toBe(run.id);
+  });
+  it("同项目不同工程师、不同幂等键并发提交同名只创建一条",async()=>{
+    const id="test-name-engineer-"+randomUUID();
+    await db.user.create({data:{id,email:id+"@example.invalid",name:"命名并发测试工程师",role:"ENGINEER",isDemo:false}});userIds.push(id);
+    const other:Actor={id,role:"ENGINEER",requestId:"integration-name-conflict"};
+    const name="Concurrent Name "+randomUUID();
+    const outcomes=await Promise.allSettled([
+      repository.create(actor,{...input,name,baselineRunId:null},randomUUID()),
+      repository.create(other,{...input,name:" "+name.toLowerCase()+" ",baselineRunId:null},randomUUID()),
+    ]);
+    const successful=outcomes.flatMap(result=>result.status==="fulfilled"?[result.value]:[]);ids.push(...successful.map(result=>result.run.id));
+    expect(successful).toHaveLength(1);expect(successful[0].replay).toBe(false);
+    expect(outcomes.find(result=>result.status==="rejected")).toMatchObject({reason:{code:"RUN_NAME_CONFLICT",status:409}});
+    expect(await db.evaluationRun.count({where:{projectId:"demo-project-warehouse",name:{equals:name,mode:"insensitive"},deletedAt:null}})).toBe(1);
+    expect(await db.auditLog.count({where:{entityId:{in:successful.map(result=>result.run.id)},action:"EVALUATION_CREATED"}})).toBe(1);
   });
   it("质量警告、FAILED、权限与同口径都在服务端拦截",async()=>{
     await expect(repository.create(actor,{...input,acceptQualityWarning:false},randomUUID())).rejects.toMatchObject({code:"QUALITY_WARNING_NOT_ACCEPTED"});
@@ -80,14 +110,18 @@ describe.skipIf(!testUrl)("评测真实数据库事务",()=>{
     expect(await db.metricResult.count({where:{runId:run.id}})).toBe(0);
     await expect(repository.cancel(actor,"demo-run-candidate")).rejects.toMatchObject({status:409});
   });
-  it("失败重试创建新任务，原失败记录保留，重复重试返回相同记录",async()=>{
+  it("失败重试使用未占名称和新任务，原失败记录保留，同键重放不改名",async()=>{
     const run=await create({mockFailure:true});
     await repository.sync(actor,run.id,at(run,3000));
     expect((await repository.sync(actor,run.id,at(run,13000))).status).toBe("FAILED");
+    const occupied=await create({name:run.name+" · 重试 1"});await repository.cancel(actor,occupied.id);
     const key=randomUUID();const next=await repository.retry(actor,run.id,key);ids.push(next.run.id);
     expect(next.run.id).not.toBe(run.id);expect(next.run.retryOfRunId).toBe(run.id);expect(next.run.mockFailure).toBe(false);
-    expect((await repository.retry(actor,run.id,key)).run.id).toBe(next.run.id);
+    expect(next.run.name).toBe(run.name+" · 重试 2");
+    const replay=await repository.retry(actor,run.id,key);expect(replay.replay).toBe(true);expect(replay.run.id).toBe(next.run.id);expect(replay.run.name).toBe(next.run.name);
+    const another=await repository.retry(actor,run.id,randomUUID());ids.push(another.run.id);expect(another.run.name).toBe(run.name+" · 重试 3");
     expect((await repository.get(run.id))?.status).toBe("FAILED");
+    expect((await repository.get(run.id))?.name).toBe(run.name);
     expect(await db.metricResult.count({where:{runId:run.id}})).toBe(0);
   });
   it("取消与完成竞争只有一个终态，事务不会留下半套结果",async()=>{
@@ -111,11 +145,12 @@ describe.skipIf(!testUrl)("评测真实数据库事务",()=>{
     await expect(create({baselineRunId:null,datasetVersionId:"demo-dataset-clean-v1",benchmarkId:"demo-benchmark-occlusion-v1"})).rejects.toMatchObject({code:"INCOMPATIBLE_CONFIGURATION"});
   });
   it("不同幂等键并发不能突破三个活跃任务，重复提交不占容量",async()=>{
-    const keys=[0,1,2,3].map(()=>randomUUID());
-    const outcomes=await Promise.allSettled(keys.map(key=>repository.create(actor,{...input,baselineRunId:null},key)));
+    const requests=[0,1,2,3].map(()=>({...input,name:input.name+" "+randomUUID(),baselineRunId:null}));
+    const keys=requests.map(()=>randomUUID());
+    const outcomes=await Promise.allSettled(requests.map((requestInput,index)=>repository.create(actor,requestInput,keys[index])));
     const successful=outcomes.flatMap(o=>o.status==="fulfilled"?[o.value]:[]);ids.push(...successful.map(o=>o.run.id));
     expect(successful).toHaveLength(3);
-    const index=outcomes.findIndex(o=>o.status==="fulfilled");expect((await repository.create(actor,{...input,baselineRunId:null},keys[index])).replay).toBe(true);expect(outcomes.filter(o=>o.status==="rejected")).toHaveLength(1);
+    const index=outcomes.findIndex(o=>o.status==="fulfilled");expect((await repository.create(actor,requests[index],keys[index])).replay).toBe(true);expect(outcomes.filter(o=>o.status==="rejected")).toHaveLength(1);
     const rejected=outcomes.find(o=>o.status==="rejected");expect(rejected?.status==="rejected" && rejected.reason.code).toBe("TASK_LIMIT_REACHED");
     await repository.cancel(actor,successful[0].run.id);const next=await create({baselineRunId:null});expect(next.status).toBe("QUEUED");
   });

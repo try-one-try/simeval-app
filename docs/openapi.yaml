@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: SimEval HTTP API
   version: 0.10.0
-  description: 合成数据与模拟执行；23 项业务操作已实现，指派和重开 2 项为 planned。Agent 仅用于聊天调查，每任务维护一份独立系统报告；本地手工验收与生产发布待完成。
+  description: 合成数据与模拟执行；23 项业务操作已实现，指派和重开 2 项为 planned。Agent 用于只读聊天调查，每任务维护一份由模板生成的系统报告。
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 tags:
 - name: Catalog
@@ -124,14 +124,29 @@ paths:
         404:
           $ref: '#/components/responses/NotFound'
         409:
-          $ref: '#/components/responses/Conflict'
+          description: 同项目名称冲突 RUN_NAME_CONFLICT、容量已满 TASK_LIMIT_REACHED 或幂等键内容冲突 IDEMPOTENCY_CONFLICT；重名提供 fieldErrors.name。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                runNameConflict:
+                  summary: 已有同项目名称，忽略首尾空格与大小写
+                  value:
+                    error:
+                      code: RUN_NAME_CONFLICT
+                      message: 已存在同名任务，请换一个任务名称
+                      fieldErrors:
+                        name:
+                        - 已存在同名任务，请换一个任务名称
+                      requestId: req_123
         422:
           $ref: '#/components/responses/Unprocessable'
         500:
           $ref: '#/components/responses/InternalError'
         503:
           $ref: '#/components/responses/ExternalServiceError'
-      description: 默认不依赖基线。按目录验证兼容性／Episode 范围／质量；同账号至多三条进行中任务，满额返回 409 TASK_LIMIT_REACHED。保存配置快照与审计，幂等重放不占新名额。
+      description: 默认不依赖基线。按目录验证兼容性／Episode 范围／质量；同项目未软删除任务名 trim 后不区分大小写，固定示例和其他创建者也占用名称，软删除名称可复用。重名返回 409 RUN_NAME_CONFLICT 与 fieldErrors.name；界面保留输入并回到名称编辑。同账号至多三条进行中任务，满额返回 409 TASK_LIMIT_REACHED。保存配置快照与审计，相同幂等请求优先返回原任务，不误报重名、不占新名额。
   /api/evaluation-runs/{runId}:
     get:
       tags:
@@ -290,6 +305,7 @@ paths:
       operationId: retryEvaluationRun
       x-implementation-status: implemented
       summary: 为失败任务创建新任务，原任务不覆盖
+      description: 本人 FAILED 任务重新检查配置与质量，新任务保留 retryOfRunId。自动命名“原名 · 重试 N”，N 从 1 起取同项目未软删除名称中未占用的编号（trim 后不区分大小写，含固定示例与其他创建者）；截短原名确保含后缀总长不超过 120 字。重试请求摘要不含动态编号，相同幂等请求优先返回原 ID 与名称，不重新分配编号。
       x-roles:
       - ENGINEER
       parameters:
@@ -586,7 +602,7 @@ paths:
       summary: 当前登录的对话，最多 40 条
       responses:
         '200':
-          description: 成功；重复请求返回已存在记录
+          description: 成功，返回当前登录的对话列表
           content:
             application/json:
               schema:
@@ -630,7 +646,7 @@ paths:
               $ref: '#/components/schemas/CreateAssistantSession'
       responses:
         '200':
-          description: 成功；重复请求返回已存在记录
+          description: 创建新会话；每次请求新建，不按任务复用
           content:
             application/json:
               schema:
@@ -1103,7 +1119,7 @@ components:
       name: Idempotency-Key
       in: header
       required: true
-      description: 同一操作者、同一键、同一请求返回同一资源；同键不同请求返回 409。
+      description: 同一操作者、同一操作、同一键、同一请求优先返回原资源，创建／重试不因已占用名称误报重名；重试请求摘要不含自动生成的名称编号。同键不同请求返回 409。
       schema:
         type: string
         minLength: 1
@@ -1314,6 +1330,7 @@ components:
           type: string
           minLength: 1
           maxLength: 120
+          description: trim 后 1–120 字；同项目未软删除任务名 trim 后不区分大小写须唯一，包含固定示例和其他创建者，软删除名称可复用。重名返回 409 RUN_NAME_CONFLICT 与 fieldErrors.name。
         modelVersionId:
           $ref: '#/components/schemas/ResourceId'
         datasetVersionId:
@@ -2334,10 +2351,10 @@ components:
         data:
           type: object
           required:
-          - runId
+          - id
           - deletedAt
           properties:
-            runId:
+            id:
               $ref: '#/components/schemas/ResourceId'
             deletedAt:
               type: string

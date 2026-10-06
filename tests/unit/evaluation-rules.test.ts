@@ -1,6 +1,6 @@
 // 领域测试覆盖门禁、口径、权限与状态，避免只复述实现。
 import { describe, expect, it, vi } from "vitest";
-import { assertQuality, assertConfiguration, assertMutable, createRunSchema, type CreateRunInput } from "@/domain/evaluation";
+import { assertQuality, assertConfiguration, assertMutable, createRunSchema, resolveRunName, RUN_NAME_MAX_LENGTH, type CreateRunInput } from "@/domain/evaluation";
 vi.mock("server-only", () => ({}));
 import { configurationProfile, type SimulationSnapshot } from "@/domain/evaluation-catalog";
 import { MockEvaluationProvider } from "@/server/providers/evaluation-provider";
@@ -19,6 +19,25 @@ describe("质量与配置门禁", () => {
     for (const change of [{episodeCount:0},{episodeCount:10001},{simulationSeed:-1},{simulationSeed:1.1},{name:" "},{createdById:"forged"}]) expect(createRunSchema.safeParse({...input,...change}).success).toBe(false);
   });
 });
+describe("任务命名边界",()=>{
+  it("兼容旧名称的空白、大小写和空值，不把不同名称误判为冲突",()=>{
+    const existing=[null,"\tWarehouse Check  \n"];
+    expect(()=>resolveRunName(" warehouse check ",existing,false)).toThrow("已存在同名任务");
+    expect(resolveRunName("  Warehouse Check v2  ",existing,false)).toBe("Warehouse Check v2");
+  });
+  it("长名称重试保留完整编号，跳过已占用名且不截断 emoji",()=>{
+    const base="a".repeat(112)+"😀"+"z".repeat(6);
+    expect(base.length).toBe(RUN_NAME_MAX_LENGTH);
+    const occupied="A".repeat(112)+" · 重试 1";
+    const name=resolveRunName(base,[" "+occupied+" "],true);
+    expect(name).toBe("a".repeat(112)+" · 重试 2");
+    expect(name.length).toBeLessThanOrEqual(RUN_NAME_MAX_LENGTH);
+    expect(createRunSchema.safeParse({...input,name}).success).toBe(true);
+    const fullLength=resolveRunName("评".repeat(RUN_NAME_MAX_LENGTH),[],true);
+    expect(fullLength.length).toBe(RUN_NAME_MAX_LENGTH);expect(fullLength.endsWith(" · 重试 1")).toBe(true);
+  });
+});
+
 describe("任务操作", () => {
   const run = {createdById:"owner",isDemoFixture:false,status:"RUNNING" as const};
   it("取消只允许工程师拥有者，固定故事和终态不修改", () => {
