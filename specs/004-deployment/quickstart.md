@@ -21,24 +21,13 @@
 - 集成测试使用 `.env.test.local` 中独立的 `TEST_DATABASE_URL`，库名必须 `simeval_test`。本机可用 `scripts/setup-local-db.ps1 -Database test` 准备。然后运行 `npm run test:integration`；未配置时明确失败。
 - `npm run test:unit` 不需要数据库。网页仍由负责人手工检查，无自动浏览器测试框架。
 
-## 3. 负责人手动恢复
+## 3. 演示数据的维护边界
 
-只对专用演示库使用；在无人操作时执行。从仓库根目录运行对应的 PowerShell 文件。先用 `--check` 查看目标主机和库名，此步不会连接或修改数据库：
+首次初始化、增量补目录和完整恢复是三种不同操作。普通构建、发布和登录不会自动清空数据。
 
-```powershell
-.\scripts\reset-dev-demo.ps1 --check
-.\scripts\reset-production-demo.ps1 --check
+完整恢复仅用于专用演示库，由维护者手动执行。程序核对目标和当前状态，在同一事务内清理业务记录并重建默认数据；表结构和 AI 累计费用账本保留，失败时回滚。网站不提供此入口，具体维护步骤单独管理。
 
-# 确认目标后，二选一运行；生产命令还需输入 RESET_PRODUCTION
-.\scripts\reset-dev-demo.ps1
-.\scripts\reset-production-demo.ps1
-```
-
-两个入口分别读取被 Git 忽略的 `.env.local`（Neon dev）和 `.env.production.local`（Neon Production）。`scripts/reset-demo.mjs` 检查连接池／直连属于同一库，并拒绝把已核对的生产端点当作 dev；生产端点变化时要先人工核对再更新脚本。它只在子进程设置 `DEMO_RESET_DATABASE` 并调用现有 `prisma/reset-demo.ts`；终端环境变量和配置文件不被改动。恢复程序在同一事务内删除业务数据、重建默认 Seed；新增任务、人工修改和删除标记被清除，表结构保留。校验失败或重建失败会回滚。网站没有恢复入口，普通 build／push／登录不触发。不要在 Git 中保存数据库凭据。
-
-运行时会显示“校验演示库 → 清理业务记录 → 重建默认 Seed”和耗时。等待建立事务最多 15 秒，清理与重建最多 3 分钟；这是上限，不是预计时长。失败时查看最后的“失败阶段／错误代码／原因”，例如 `P2028` 表示事务等待、超时或中断，表／字段缺失则应核对迁移。只报告白名单信息，不输出原始异常或连接密码。`pg` 的 SSL 模式兼容性警告本身不等于恢复失败，是否完成以最后的成功／失败消息为准。
-
-## 4. Vercel 上线仍需完成
+## 4. Vercel 部署与上线检查
 
 连接本公开仓库，选 Node.js 22；安装 `npm ci`，构建 `npm run build`。关联 Neon 并配置生产环境连接、`AUTH_SECRET`、`ACCESS_PASSWORD`，使用直连先执行迁移及首次 Seed。预览环境单独配置数据库；普通构建不自动执行迁移、Seed 或恢复。
 
@@ -54,4 +43,4 @@ node --env-file=.env.production.local --import tsx prisma/seed.ts
 
 先确认迁移成功，再执行 Seed；随后在 Vercel Redeploy。Seed 直接由 Node 加载 tsx，沿用同一份初始化逻辑，不依赖终端全局安装 tsx。这两条初始化命令不需要每次发布都运行。
 
-上线验收：没有访问密码不能进入工作台或调用业务接口；两身份登录／切换、连续输错限流、创建／完成／取消／重试／删除、对比／复核、刷新持久化、375px、日志与恢复均有实际证据。访问密码可被转发，不能识别访客本人；Vercel 访问保护与大陆可达性需另验。代码适配不代表已经上线。
+发布后应检查：未登录不能进入工作台或调用业务接口；两身份登录／切换、连续输错限流、创建／完成／取消／重试／删除、对比／复核、刷新持久化和窄屏操作正常。访问密码控制演示入口，不识别访客本人；平台访问保护与不同网络下的可达性需单独核对。
