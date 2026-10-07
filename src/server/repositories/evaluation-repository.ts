@@ -84,6 +84,13 @@ async function createInTransaction(tx: Tx, actor: Actor, input: CreateRunInput, 
   return { run, replay: false };
 }
 export const evaluationRepository = {
+  async runNamesForModel(modelVersionId: string) {
+    // 只读取项目中仍占用的名称，不加载任务详情，也不使用近期任务的分页结果。
+    const model = await getDb().modelVersion.findUnique({ where: { id: modelVersionId }, select: { projectId: true } });
+    if (!model) return null;
+    const runs = await getDb().evaluationRun.findMany({ where: { projectId: model.projectId, deletedAt: null }, select: { name: true } });
+    return runs.map(run => run.name);
+  },
   async options(actor: Actor) {
     const project = await getDb().project.findUnique({
       where: { slug: "warehouse-manipulation" },

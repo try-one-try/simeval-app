@@ -9,8 +9,15 @@ export class AppError extends Error {
 export const idSchema = z.string().trim().min(1).max(64).regex(/^[a-zA-Z0-9_-]+$/);
 export const keySchema = z.string().trim().min(1).max(128);
 export const RUN_NAME_MAX_LENGTH = 120;
+export const runNameSchema = z.string().trim().min(1, "请填写任务名称").max(RUN_NAME_MAX_LENGTH);
+export const prepareRunNameSchema = z.object({
+  modelVersionId: idSchema,
+  name: runNameSchema,
+  mode: z.enum(["check", "suggest"]).default("check"),
+}).strict();
+export type PrepareRunNameInput = z.infer<typeof prepareRunNameSchema>;
 export const createRunSchema = z.object({
-  name: z.string().trim().min(1, "请填写任务名称").max(RUN_NAME_MAX_LENGTH),
+  name: runNameSchema,
   modelVersionId: idSchema, datasetVersionId: idSchema, benchmarkId: idSchema, baselineRunId: idSchema.nullable().optional(),
   targetSuccessRate: z.union([z.literal(.8), z.literal(.85)]).nullable().optional(),
   episodeCount: z.number().int().min(1).max(10000), simulationSeed: z.number().int().min(0).max(2147483647),
@@ -23,11 +30,27 @@ export const listRunSchema = z.object({
   status: z.enum(["QUEUED","RUNNING","SUCCEEDED","FAILED","CANCELLED"]).optional(),
 }).strict();
 export type CreateRunInput = z.infer<typeof createRunSchema>;
+function occupiedRunNames(names: readonly (string | null)[]) {
+  return new Set(names.flatMap(value => value === null ? [] : [value.trim().toLowerCase()]));
+}
+function nameWithSuffix(base: string, suffix: string) {
+  // 给编号留出长度，避免把 emoji 等双码元字符截成一半。
+  return base.slice(0, RUN_NAME_MAX_LENGTH - suffix.length).replace(/[\uD800-\uDBFF]$/, "").trimEnd() + suffix;
+}
+// 模板名称已被使用时，跳过占用的编号；填表本身不会预留名称。
+export function suggestRunName(name: string, existingNames: readonly (string | null)[]) {
+  const base = name.trim(), occupied = occupiedRunNames(existingNames);
+  if (!occupied.has(base.toLowerCase())) return base;
+  for (let number = 2; ; number++) {
+    const candidate = nameWithSuffix(base, ` (${number})`);
+    if (!occupied.has(candidate.toLowerCase())) return candidate;
+  }
+}
 // 同项目的可见任务不能重名；旧名称也去两端空格、忽略大小写。
 // 重试会另建任务，用未占用的编号区分，不让原失败任务挡住重试。
 export function resolveRunName(name: string, existingNames: readonly (string | null)[], retry: boolean) {
   const base = name.trim();
-  const occupied = new Set(existingNames.flatMap(value => value === null ? [] : [value.trim().toLowerCase()]));
+  const occupied = occupiedRunNames(existingNames);
   if (!retry) {
     if (occupied.has(base.toLowerCase())) {
       const message = "已存在同名任务，请换一个任务名称";
@@ -37,9 +60,7 @@ export function resolveRunName(name: string, existingNames: readonly (string | n
   }
   for (let number = 1; ; number++) {
     const suffix = ` · 重试 ${number}`;
-    // 给后缀留出长度，并避免截断在一个双码元字符（如 emoji）的中间。
-    const prefix = base.slice(0, RUN_NAME_MAX_LENGTH - suffix.length).replace(/[\uD800-\uDBFF]$/, "").trimEnd();
-    const candidate = prefix + suffix;
+    const candidate = nameWithSuffix(base, suffix);
     if (!occupied.has(candidate.toLowerCase())) return candidate;
   }
 }

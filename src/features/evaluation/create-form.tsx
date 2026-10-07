@@ -20,7 +20,8 @@ export function CreateForm({ options, actor }: { options: EvaluationOptions; act
   const [quality, setQuality] = useState<QualityData | null>(null);
   const [accepted, setAccepted] = useState(false);
   const [mockFailure, setMockFailure] = useState(false);
-  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<"demo" | "quality" | "create" | null>(null);
+  const busy = pending !== null;
   const [error, setError] = useState("");
   const [fields, setFields] = useState<Record<string, string[]>>({});
   const submission = useRef<{ body: string; key: string } | null>(null);
@@ -32,18 +33,33 @@ export function CreateForm({ options, actor }: { options: EvaluationOptions; act
   const valid = actor.role === "ENGINEER" && !!name.trim() && !!profile && Number.isInteger(episodes) && episodes >= profile.minEpisodes && episodes <= profile.maxEpisodes && Number.isInteger(seed) && seed >= 0 && seed <= 2147483647;
   const canStart = valid && !!quality?.canStartEvaluation && (quality.dataset.qualityStatus !== "WARNING" || accepted);
   function configurationChanged() { setBaselineId(""); setAccepted(false); setQuality(null); setError(""); }
-  function demo() {
-    setName(CUSTOM_DEMO_RUN_NAME); setModelId("demo-model-candidate"); setDatasetId("demo-dataset-scenes-v3");
-    setBenchmarkId("demo-benchmark-v1"); setEpisodes(200); setSeed(20260901);
-    setTarget("0.8"); setBaselineId(""); setAccepted(false); setQuality(null); setError(""); setFields({});
+  async function demo() {
+    if (busy) return;
+    setPending("demo"); setError(""); setFields({});
+    try {
+      // 每次点击都读取最新占用情况，避免第二次套用模板时仍填入旧名字。
+      const query = new URLSearchParams({ modelVersionId: "demo-model-candidate", name: CUSTOM_DEMO_RUN_NAME, mode: "suggest" });
+      const result = await apiRequest<{ name: string }>("/api/evaluation-runs/name?" + query);
+      setName(result.name); setModelId("demo-model-candidate"); setDatasetId("demo-dataset-scenes-v3");
+      setBenchmarkId("demo-benchmark-v1"); setEpisodes(200); setSeed(20260901);
+      setTarget("0.8"); setBaselineId(""); setAccepted(false); setQuality(null);
+    } catch (failure) {
+      setError(errorText(failure));
+    } finally { setPending(null); }
   }
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!valid || busy) return;
-    setBusy(true); setError(""); setFields({});
+    setPending(step === 1 ? "quality" : "create"); setError(""); setFields({});
     try {
       if (step === 1) {
-        setQuality(await apiRequest<QualityData>("/api/datasets/" + datasetId + "/quality"));
+        const query = new URLSearchParams({ modelVersionId: modelId, name: name.trim(), mode: "check" });
+        // 两项都成功才进入质量确认；并行读取，减少额外等待。
+        const [, checkedQuality] = await Promise.all([
+          apiRequest<{ name: string }>("/api/evaluation-runs/name?" + query),
+          apiRequest<QualityData>("/api/datasets/" + datasetId + "/quality"),
+        ]);
+        setQuality(checkedQuality);
         setStep(2); setAccepted(false); requestAnimationFrame(() => heading.current?.focus());
       } else if (canStart) {
         const body = JSON.stringify({ name: name.trim(), modelVersionId: modelId, datasetVersionId: datasetId, benchmarkId, baselineRunId: baselineId || null, targetSuccessRate: target ? Number(target) : null, episodeCount: episodes, simulationSeed: seed, acceptQualityWarning: accepted, mockFailure });
@@ -59,17 +75,17 @@ export function CreateForm({ options, actor }: { options: EvaluationOptions; act
         setFields(failure.fieldErrors ?? {});
         if (failure.fieldErrors?.name?.length) {
           // 名称在第一步：保留其他配置，回到这里改名，再重新确认质量。
-          setStep(1); setAccepted(false);
+          setStep(1); setAccepted(false); setQuality(null);
           requestAnimationFrame(() => nameInput.current?.focus());
         }
       }
     }
-    setBusy(false);
+    setPending(null);
   }
   return <section className="content workflow-content create-view">
     <div className="page-context">创建评测 / {step === 1 ? "配置与确认" : "02 确认数据质量"}<span>01 配置评测　02 确认数据质量</span></div>
     <div className="overview-heading"><div><h1 ref={heading} tabIndex={-1}>{step === 1 ? "创建评测" : "确认所选数据质量"}</h1><p className="muted">{step === 1 ? "先选择测试对象与评测口径，再检查数据质量。" : name}</p></div>
-      {step === 1 && <div className="demo-config"><p className="fine-print">快速体验</p><button className="text-action" onClick={demo} disabled={busy}>使用演示配置 ↗</button><p className="fine-print">由你点击填入 · 不会直接创建任务</p></div>}</div>
+      {step === 1 && <div className="demo-config"><p className="fine-print">快速体验</p><button className="text-action" onClick={demo} disabled={busy}>{pending === "demo" ? "正在准备配置…" : "使用演示配置 ↗"}</button><p className="fine-print">自动避开已有名称 · 不会直接创建任务</p></div>}</div>
     <form onSubmit={submit}>
       {step === 1 ? <>
         <div className="evaluation-fields">
@@ -99,7 +115,7 @@ export function CreateForm({ options, actor }: { options: EvaluationOptions; act
         <details className="advanced-settings"><summary>本次配置</summary><p>{options.models.find(m => m.id === modelId)?.name} {options.models.find(m => m.id === modelId)?.version} · {benchmark?.name}</p><p>{episodes} Episodes · Seed {seed} · {baselineId ? "已选择历史基线" : "无比较基线"} · {target ? "目标 " + Number(target) * 100 + "%" : "未设达标目标"}</p></details>
       </>}
       {error && <div className="request-error" role="alert"><p>{error}</p>{Object.entries(fields).filter(([key]) => key !== "name").map(([key, values]) => <p key={key}>{values.join("；")}</p>)}</div>}
-      <div className="workflow-actions"><button className="primary-button" type="submit" disabled={busy || (step === 1 ? !valid : !canStart)}>{busy ? (step === 1 ? "正在读取质量…" : "正在创建…") : step === 1 ? "检查数据质量 →" : quality?.dataset.qualityStatus === "FAILED" ? "质量未通过，不能创建" : quality?.dataset.qualityStatus === "WARNING" && !accepted ? "请先接受质量警告" : "创建并启动评测 →"}</button>
+      <div className="workflow-actions"><button className="primary-button" type="submit" disabled={busy || (step === 1 ? !valid : !canStart)}>{pending === "quality" ? "正在检查名称与质量…" : pending === "create" ? "正在创建…" : step === 1 ? "检查数据质量 →" : quality?.dataset.qualityStatus === "FAILED" ? "质量未通过，不能创建" : quality?.dataset.qualityStatus === "WARNING" && !accepted ? "请先接受质量警告" : "创建并启动评测 →"}</button>
         {step === 2 && <button className="text-action" type="button" disabled={busy} onClick={() => { setStep(1); setAccepted(false); setError(""); requestAnimationFrame(() => heading.current?.focus()); }}>返回修改配置 ←</button>}</div>
     </form>
     <p className="fine-print">合成数据 · 模拟执行，不训练模型、不运行真实仿真器。最多同时运行 {options.activeTaskLimit} 个任务。</p>

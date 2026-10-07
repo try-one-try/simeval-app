@@ -4,7 +4,7 @@
 
 ## 1. 可调用与待实施
 
-**接口版本 0.10.0。** 当前有 23 项业务操作：14 项评测与复核、5 项聊天、4 项报告。指派和重新打开样本仍标为 planned。报告与聊天独立，每个任务最多一份当前系统报告。完整的人读接口说明、数据格式与架构统一见[架构与接口](架构与接口.md)；本文保留可执行请求示例。
+**接口版本 0.11.0。** 当前有 24 项业务操作：15 项评测与复核、5 项聊天、4 项报告。指派和重新打开样本仍标为 planned。报告与聊天独立，每个任务最多一份当前系统报告。完整的人读接口说明、数据格式与架构统一见[架构与接口](架构与接口.md)；本文保留可执行请求示例。
 
 仅两个预设账号会话有效，旧 ADMIN 返回 401。工程师管理本人任务，评测人员只读任务；服务端拒绝越权写入。回补和人工分类退出当前产品，历史数据库关系保留。
 
@@ -12,7 +12,7 @@
 
 - **身份与写入**：校验 Session、预设账号 email／isDemo 和数据库角色；写入要求同源 Origin、Zod 与业务权限。POST／PATCH／DELETE 都校验 Origin。
 - **输入与分页**：ID 长 1–64，仅字母／数字／下划线／连字符；Body 拒绝多余字段。任务名 trim 后 1–120 字，Episode 1–10000，Seed 0–2147483647；目录另收紧 Episode。page 从 1，pageSize 默认 20／最多 100，任务按时间倒序＋ID 排序；异常按 sampleNumber＋ID 升序。
-- **任务防重名**：同项目所有未软删除任务名须唯一，包含固定示例和其他创建者；新旧名称都 `trim().toLowerCase()` 后比较，已软删除名称可复用。创建重名返回 `409 RUN_NAME_CONFLICT` 与 `fieldErrors.name`；界面保留全部输入，回到配置步骤修改名称。本次不自动修改历史名称。
+- **任务防重名**：同项目所有未软删除任务名须唯一，包含固定示例和其他创建者；新旧名称都 `trim().toLowerCase()` 后比较，已软删除名称可复用。名称预检查和创建重名均返回 `409 RUN_NAME_CONFLICT` 与 `fieldErrors.name`；界面保留全部输入，定位配置步骤的名称字段。“使用演示配置”实时获取空闲名称，原名被占用时依次尝试 `(2)`、`(3)`。预检查和建议都不预留名称，最终创建仍在事务内查重；不自动修改历史名称。
 - **响应**：成功 `{data,meta:{requestId}}`；错误 `{error:{code,message,fieldErrors,requestId}}`。fieldErrors 为字段消息数组映射或 null；不泄漏 SQL、密码或堆栈。
 - **身份显示**：复核中的编辑者、确认人和历史操作者 `name` 使用“算法工程师”“评测人员”等角色名称，不使用旧账号昵称；`id` 与原记录关联不变。
 - **幂等**：创建／重试带 1–128 字符 Idempotency-Key；聊天用正文 requestKey UUID。同用户／操作／键及内容重复返回原对象；同键换内容 409。创建首次 201，重复 200；重放优先返回原任务，不因已有名称误报重名，重试请求摘要不含动态编号。报告不收幂等头：按任务唯一键维护一份，来源未变化时返回原报告，变化时更新同一 ID。
@@ -40,7 +40,15 @@ QUEUED／RUNNING 可取消；任务已经完成或状态竞争时返回 409。FA
 GET {{baseUrl}}/api/evaluation-catalog
 Cookie: {{sessionCookie}}
 
-### 质量报告：200，四项检查
+### 名称预检查：200 返回 {name}；重名 409，默认 mode=check，仅工程师
+GET {{baseUrl}}/api/evaluation-runs/name?modelVersionId=demo-model-candidate&name=Custom%20-%20Warehouse%20Manipulation%20v2.4
+Cookie: {{sessionCookie}}
+
+### 模板建议名称：200 返回原名或未占用的编号名称；不创建任务
+GET {{baseUrl}}/api/evaluation-runs/name?modelVersionId=demo-model-candidate&name=Custom%20-%20Warehouse%20Manipulation%20v2.4&mode=suggest
+Cookie: {{sessionCookie}}
+
+### 质量报告：200，四项检查；创建页与名称预检查并行读取，两项成功才进入第二步
 GET {{baseUrl}}/api/datasets/demo-dataset-scenes-v3/quality
 Cookie: {{sessionCookie}}
 
@@ -238,7 +246,7 @@ PATCH 返回完整详情，sample.version 是下一次编辑的 expectedVersion�
 
 ## 阶段 8：聊天与报告
 
-这些 JSON 接口仍使用 data/meta.requestId，错误沿用 error.code/message/fieldErrors/requestId，写操作检查 Origin。聊天接口要求登录令牌中的 accessId；报告接口使用普通业务身份校验，不依赖 accessId、sessionId 或 turnId。字段及逐行事件完整定义在 OpenAPI 0.10.0。
+这些 JSON 接口仍使用 data/meta.requestId，错误沿用 error.code/message/fieldErrors/requestId，写操作检查 Origin。聊天接口要求登录令牌中的 accessId；报告接口使用普通业务身份校验，不依赖 accessId、sessionId 或 turnId。字段及逐行事件完整定义在 OpenAPI 0.11.0。
 
 | 方法与路径 | 请求 | 返回／约束 |
 |---|---|---|
@@ -300,3 +308,4 @@ Content-Type: application/json
 | 2026-10-03 | 0.9.0 | 报告改为每任务一份系统模板，与聊天独立；生成仅 runId，确认必须 expectedSourceHash，返回增加 updatedAt/sourceHash，移除 output.sourceTurnId；独立总览取消 |
 | 2026-10-04 | 0.10.0 | 任务列表返回 RunSummary；比较 baselines 返回 id/name/modelVersion 摘要。任务详情与实际选中基线仍返回完整 Run；分页、权限及错误结构不变 |
 | 2026-10-05 | 0.10.0 错误扩展 | 同项目未删除任务名 trim 后不区分大小写，创建重名返回 RUN_NAME_CONFLICT 与 fieldErrors.name；重试自动编号、幂等重放返回原任务。成功字段不变，无新增迁移；本轮按负责人约定未运行检查或浏览器验收 |
+| 2026-10-07 | 0.11.0 | 新增名称预检查／建议接口；检查质量前反馈重名，演示配置实时选择未占用名称。接口只读，创建仍事务查重；同步相关测试用例，按负责人约定未运行 |

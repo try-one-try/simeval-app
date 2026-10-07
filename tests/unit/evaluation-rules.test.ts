@@ -1,6 +1,6 @@
 // 领域测试覆盖门禁、口径、权限与状态，避免只复述实现。
 import { describe, expect, it, vi } from "vitest";
-import { assertQuality, assertConfiguration, assertMutable, createRunSchema, resolveRunName, RUN_NAME_MAX_LENGTH, type CreateRunInput } from "@/domain/evaluation";
+import { assertQuality, assertConfiguration, assertMutable, createRunSchema, resolveRunName, suggestRunName, RUN_NAME_MAX_LENGTH, type CreateRunInput } from "@/domain/evaluation";
 vi.mock("server-only", () => ({}));
 import { configurationProfile, type SimulationSnapshot } from "@/domain/evaluation-catalog";
 import { MockEvaluationProvider } from "@/server/providers/evaluation-provider";
@@ -20,6 +20,14 @@ describe("质量与配置门禁", () => {
   });
 });
 describe("任务命名边界",()=>{
+  it("模板建议跳过已有编号，沿用忽略大小写和两端空格的查重规则",()=>{
+    expect(suggestRunName(" Custom ",[null,"Different"])).toBe("Custom");
+    expect(suggestRunName("Custom",[" custom ","CUSTOM (2)","Custom (4)"])).toBe("Custom (3)");
+    const base="a".repeat(115)+"😀"+"zzz";
+    const name=suggestRunName(base,[base,"A".repeat(115)+" (2)"]);
+    expect(name).toBe("a".repeat(115)+" (3)");
+    expect(createRunSchema.safeParse({...input,name}).success).toBe(true);
+  });
   it("兼容旧名称的空白、大小写和空值，不把不同名称误判为冲突",()=>{
     const existing=[null,"\tWarehouse Check  \n"];
     expect(()=>resolveRunName(" warehouse check ",existing,false)).toThrow("已存在同名任务");

@@ -1,8 +1,8 @@
 openapi: 3.1.0
 info:
   title: SimEval HTTP API
-  version: 0.10.0
-  description: 合成数据与模拟执行；23 项业务操作已实现，指派和重开 2 项为 planned。Agent 用于只读聊天调查，每任务维护一份由模板生成的系统报告。
+  version: 0.11.0
+  description: 合成数据与模拟执行；24 项业务操作已实现，指派和重开 2 项为 planned。Agent 用于只读聊天调查，每任务维护一份由模板生成的系统报告。
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 tags:
 - name: Catalog
@@ -147,6 +147,76 @@ paths:
         503:
           $ref: '#/components/responses/ExternalServiceError'
       description: 默认不依赖基线。按目录验证兼容性／Episode 范围／质量；同项目未软删除任务名 trim 后不区分大小写，固定示例和其他创建者也占用名称，软删除名称可复用。重名返回 409 RUN_NAME_CONFLICT 与 fieldErrors.name；界面保留输入并回到名称编辑。同账号至多三条进行中任务，满额返回 409 TASK_LIMIT_REACHED。保存配置快照与审计，相同幂等请求优先返回原任务，不误报重名、不占新名额。
+  /api/evaluation-runs/name:
+    get:
+      tags:
+      - Evaluation
+      operationId: prepareEvaluationRunName
+      x-implementation-status: implemented
+      summary: 创建前校验名称或为模板提供未占用名称
+      description: 按模型版本所属项目检查所有未软删除任务名，忽略首尾空格与大小写。check 模式重名返回 409 RUN_NAME_CONFLICT；suggest 模式优先返回原名，已占用则从 (2) 起选择首个空闲编号，总长不超过 120。只读，不预留名称；创建事务仍重新查重。未知查询字段返回 422。
+      x-roles:
+      - ENGINEER
+      parameters:
+      - name: modelVersionId
+        in: query
+        required: true
+        schema:
+          $ref: '#/components/schemas/ResourceId'
+      - name: name
+        in: query
+        required: true
+        schema:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description: 去两端空格后的任务名称或模板原名。
+      - name: mode
+        in: query
+        schema:
+          type: string
+          enum: [check, suggest]
+          default: check
+      responses:
+        200:
+          description: 校验通过的名称或自动编号的建议名称；没有创建任务。
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: object
+                    required: [name]
+                    properties:
+                      name:
+                        type: string
+                        minLength: 1
+                        maxLength: 120
+                  meta:
+                    $ref: '#/components/schemas/RequestMeta'
+              example:
+                data:
+                  name: Custom - Warehouse Manipulation v2.4 (2)
+                meta:
+                  requestId: req_123
+        401:
+          $ref: '#/components/responses/Unauthorized'
+        403:
+          $ref: '#/components/responses/Forbidden'
+        404:
+          $ref: '#/components/responses/NotFound'
+        409:
+          description: check 模式名称已占用，返回 RUN_NAME_CONFLICT 与 fieldErrors.name。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+        422:
+          $ref: '#/components/responses/Unprocessable'
+        500:
+          $ref: '#/components/responses/InternalError'
   /api/evaluation-runs/{runId}:
     get:
       tags:

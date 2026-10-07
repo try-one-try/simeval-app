@@ -2,12 +2,13 @@
 import { beforeEach, expect, it, vi } from "vitest";
 import { AppError } from "@/domain/evaluation";
 vi.mock("server-only",()=>({}));
-const mocks=vi.hoisted(()=>({auth:vi.fn(),user:vi.fn(),create:vi.fn(),list:vi.fn(),get:vi.fn(),remove:vi.fn(),options:vi.fn()}));
+const mocks=vi.hoisted(()=>({auth:vi.fn(),user:vi.fn(),create:vi.fn(),list:vi.fn(),get:vi.fn(),remove:vi.fn(),options:vi.fn(),prepareName:vi.fn()}));
 vi.mock("@/auth",()=>({auth:mocks.auth}));
 vi.mock("@/server/repositories/user-repository",()=>({userRepository:{findById:mocks.user}}));
-vi.mock("@/server/application/evaluation",()=>({evaluationService:{create:mocks.create,list:mocks.list,get:mocks.get,remove:mocks.remove,options:mocks.options},statusDto:(run:unknown)=>run}));
+vi.mock("@/server/application/evaluation",()=>({evaluationService:{create:mocks.create,list:mocks.list,get:mocks.get,remove:mocks.remove,options:mocks.options,prepareName:mocks.prepareName},statusDto:(run:unknown)=>run}));
 import { DELETE as removeRun } from "@/app/api/evaluation-runs/[runId]/route";
 import { GET as catalogGET } from "@/app/api/evaluation-catalog/route";
+import { GET as nameGET } from "@/app/api/evaluation-runs/name/route";
 import { GET,POST } from "@/app/api/evaluation-runs/route";
 import { GET as statusGET } from "@/app/api/evaluation-runs/[runId]/status/route";
 const body={name:"任务",modelVersionId:"candidate",datasetVersionId:"dataset",benchmarkId:"benchmark",baselineRunId:"baseline",episodeCount:200,simulationSeed:20260901,acceptQualityWarning:true};
@@ -59,6 +60,28 @@ it("分页参数校验并返回 meta",async()=>{
   expect((await GET(new Request("http://localhost:3000/api/evaluation-runs?page=0"))).status).toBe(422);
   mocks.list.mockResolvedValue({data:[],total:0});
   const response=await GET(new Request("http://localhost:3000/api/evaluation-runs"));expect((await response.json()).meta).toMatchObject({page:1,pageSize:20,total:0});
+});
+it("名称预检查沿用重名错误，建议名称不会调用创建",async()=>{
+  const url="http://localhost:3000/api/evaluation-runs/name?modelVersionId=candidate&name=Custom";
+  const message="已存在同名任务，请换一个任务名称";
+  mocks.prepareName.mockRejectedValueOnce(new AppError("RUN_NAME_CONFLICT",message,409,{name:[message]}));
+  const response=await nameGET(new Request(url));
+  expect(response.status).toBe(409);
+  expect((await response.json()).error).toMatchObject({code:"RUN_NAME_CONFLICT",fieldErrors:{name:[message]},requestId:expect.any(String)});
+  mocks.prepareName.mockResolvedValueOnce({name:"Custom (3)"});
+  const suggestion=await nameGET(new Request(url+"&mode=suggest"));
+  expect(suggestion.status).toBe(200);expect((await suggestion.json()).data.name).toBe("Custom (3)");
+  expect(mocks.create).not.toHaveBeenCalled();
+});
+it("名称接口拒绝未登录、非工程师及无效参数",async()=>{
+  const url="http://localhost:3000/api/evaluation-runs/name?modelVersionId=candidate&name=Custom";
+  mocks.auth.mockResolvedValueOnce(null);
+  expect((await nameGET(new Request(url))).status).toBe(401);
+  mocks.user.mockResolvedValueOnce({id:"user",role:"REVIEWER",email:"reviewer@demo.simeval.local",isDemo:true});
+  expect((await nameGET(new Request(url))).status).toBe(403);
+  for(const query of ["modelVersionId=candidate&name=%20","name=Custom","modelVersionId=candidate&name=Custom&mode=write","modelVersionId=candidate&name=Custom&projectId=forged"])
+    expect((await nameGET(new Request("http://localhost:3000/api/evaluation-runs/name?"+query))).status).toBe(422);
+  expect(mocks.prepareName).not.toHaveBeenCalled();
 });
 it("GET status 只读，不调用创建或推进",async()=>{
   mocks.get.mockResolvedValue({status:"QUEUED"});

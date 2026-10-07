@@ -1,7 +1,7 @@
 // 应用层把仓储实体整理为公开 DTO；读操作不推进任务状态。
 import "server-only";
 import { evaluationRepository, type StoredRun, type StoredRunSummary } from "@/server/repositories/evaluation-repository";
-import { AppError, assertRole, isActive, type Actor, type CreateRunInput } from "@/domain/evaluation";
+import { AppError, assertRole, isActive, resolveRunName, suggestRunName, type Actor, type CreateRunInput, type PrepareRunNameInput } from "@/domain/evaluation";
 import type { RunData, RunSummaryData, QualityData, EvaluationOptions } from "@/lib/evaluation-dto";
 import { ACTIVE_TASK_LIMIT, benchmarks, models, metricCatalog, snapshotSchema } from "@/domain/evaluation-catalog";
 const readers = ["ENGINEER", "REVIEWER", "ADMIN"] as const;
@@ -43,6 +43,13 @@ export function statusDto(run: RunData) {
     startedAt: run.startedAt, finishedAt: run.finishedAt, pollAfterMs: isActive(run.status) ? 1500 : 0 };
 }
 export const evaluationService = {
+  async prepareName(actor: Actor, input: PrepareRunNameInput) {
+    assertRole(actor, ["ENGINEER"]);
+    const names = await evaluationRepository.runNamesForModel(input.modelVersionId);
+    if (names === null) throw new AppError("NOT_FOUND", "模型版本不存在", 404);
+    // 这里只给当前表单反馈；真正创建时仍在项目锁内重新查重。
+    return { name: input.mode === "suggest" ? suggestRunName(input.name, names) : resolveRunName(input.name, names, false) };
+  },
   async options(actor: Actor): Promise<EvaluationOptions> {
     assertRole(actor, readers);
     const { project, recent } = await evaluationRepository.options(actor);
