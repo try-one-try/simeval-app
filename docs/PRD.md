@@ -37,6 +37,40 @@ SimEval 是一个具身智能模型评测平台。当前版本以仓储抓取与
 
 ## 3. 一次评测的完整流程
 
+### 用户流程图
+
+实线表示主要流程，虚线表示按需使用的功能。评测人员可以直接选择已有的成功任务，从异常复核开始。
+
+```mermaid
+flowchart TD
+    configure["算法工程师：配置评测"] --> quality{"确认数据质量"}
+    quality -->|"通过，或明确接受警告"| execute["创建任务并模拟执行"]
+    quality -->|"失败，或不接受警告"| revise["返回修改配置"]
+    revise --> configure
+    execute -->|"执行成功"| results["查看指标与达标情况"]
+    results --> evidence["定位异常样本，查看日志证据"]
+    evidence --> review["编辑草稿，由评测人员确认结论"]
+    review --> report["生成或更新同一份任务报告"]
+    results -->|"无异常时"| report
+    report --> confirm["评测人员核对并确认报告"]
+
+    results -.-> compare["可选：工程师比较同口径历史结果"]
+    compare -.-> evidence
+    evidence -.-> assistant["可选：向 AI 助手提问，查询指标与证据"]
+    assistant -.-> evidence
+
+    classDef main fill:#ffffff,stroke:#262626,color:#171717;
+    classDef optional fill:#f5f5f5,stroke:#737373,color:#404040,stroke-dasharray:5 5;
+    classDef decision fill:#eeeeee,stroke:#262626,color:#171717;
+    class configure,revise,execute,results,evidence,review,report,confirm main;
+    class compare,assistant optional;
+    class quality decision;
+```
+
+图中展示成功执行后的典型路径。执行失败可创建重试任务，执行结束前可以取消；具体规则见第 4.3 节。助手也可从结果等页面打开，不限于查看样本时使用。报告可以在复核全部完成前生成，尚未确认的内容会明确标注；后续结论变化时更新原报告，再由评测人员核对确认。
+
+### 各步骤说明
+
 主要体验流程如下：
 
 1. **配置评测。** 工程师填写任务名称，选择模型、数据集和评测规则；可设置成功率目标，也可选择一份成功的历史任务作为比较基线。
