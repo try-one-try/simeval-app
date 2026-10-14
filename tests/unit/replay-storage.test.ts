@@ -10,7 +10,23 @@ describe("私有回放素材传输", () => {
     mocks.head.mockReset();
     mocks.head.mockResolvedValue({ url: "https://test.private.blob.vercel-storage.com/video.mp4", size: 10 });
   });
-  afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+  afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+
+  it("收到响应后不会按总下载时间截断视频，客户端取消仍传递", async () => {
+    vi.useFakeTimers();
+    let receivedSignal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((_url, options) => {
+      receivedSignal = options.signal;
+      return Promise.resolve(new Response(new Uint8Array(10), { headers: { "content-length": "10" } }));
+    }));
+    const { replayAsset, replayAssetStream } = await import("@/server/providers/replay-storage");
+    const caller = new AbortController();
+    await replayAssetStream(await replayAsset("head.mp4"), null, caller.signal);
+    await vi.advanceTimersByTimeAsync(180000);
+    expect(receivedSignal?.aborted).toBe(false);
+    caller.abort();
+    expect(receivedSignal?.aborted).toBe(true);
+  });
 
   it("Range 原样请求并检查范围，凭证只发给私有 Blob", async () => {
     const request = vi.fn().mockResolvedValue(new Response(new Uint8Array([1,2,3]), { status: 206, headers: { "content-length": "3", "content-range": "bytes 2-4/10" } }));

@@ -39,12 +39,19 @@ export async function replayAsset(name: AssetName): Promise<Asset> {
   return value;
 }
 
-function fetchBlob(url: string, range: { start: number; end: number } | null, signal?: AbortSignal) {
-  return fetch(url, {
-    headers: { Authorization: `Bearer ${token()}`, ...(range ? { Range: `bytes=${range.start}-${range.end}` } : {}) },
-    redirect: "error", cache: "no-store",
-    signal: AbortSignal.any([AbortSignal.timeout(120000), ...(signal ? [signal] : [])]),
-  });
+async function fetchBlob(url: string, range: { start: number; end: number } | null, signal?: AbortSignal) {
+  const waiting = new AbortController();
+  const timer = setTimeout(() => waiting.abort(), 30000);
+  try {
+    return await fetch(url, {
+      headers: { Authorization: `Bearer ${token()}`, ...(range ? { Range: `bytes=${range.start}-${range.end}` } : {}) },
+      redirect: "error", cache: "no-store",
+      signal: AbortSignal.any([waiting.signal, ...(signal ? [signal] : [])]),
+    });
+  } finally {
+    // 超时只限制等待响应头；视频开始流式传输后，不能按总下载时间截断慢网播放。
+    clearTimeout(timer);
+  }
 }
 
 export async function replayAssetStream(asset: Asset, range: { start: number; end: number } | null, signal?: AbortSignal) {
