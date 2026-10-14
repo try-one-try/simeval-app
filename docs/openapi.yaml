@@ -97,6 +97,7 @@ paths:
     get:
       tags: [Replay]
       summary: 登录后读取固定三路 H.264 MP4；支持单段 HTTP Range
+      description: 本地文件或 Private Blob 经服务端鉴权后流式返回，浏览器不接收存储密钥。上游范围或长度不匹配时拒绝返回伪造的 206。
       operationId: getReplayVideo
       parameters:
       - $ref: '#/components/parameters/ReplayEpisodeId'
@@ -122,6 +123,7 @@ paths:
         '403': {description: 无权限}
         '404': {description: 非固定记录或摄像头}
         '416': {description: INVALID_RANGE，Content-Range 指明完整文件长度}
+        '500': {description: INTERNAL_ERROR，视频源读取失败或上游范围响应不正确}
         '503': {description: 视频文件未准备好}
   /api/datasets/{datasetId}/quality:
     get:

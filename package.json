@@ -5,6 +5,7 @@
   "type": "module",
   "description": "SimEval 是面向具身智能团队的评测数据工作台。它围绕数据质量、模拟评测、模型版本对比、异常样本复核、轻量数据回补和证据报告，帮助团队解释候选模型能否替换基线。",
   "scripts": {
+    "replay:upload": "node scripts/upload-replay.mjs",
     "postinstall": "prisma generate",
     "dev": "next dev",
     "build": "next build",
@@ -32,6 +33,7 @@
     "@langchain/openai": "1.6.2",
     "@prisma/adapter-pg": "7.10.0",
     "@prisma/client": "7.10.0",
+    "@vercel/blob": "2.8.2",
     "bcryptjs": "3.0.3",
     "langchain": "1.5.15",
     "lucide-react": "1.47.0",

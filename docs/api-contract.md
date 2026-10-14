@@ -339,3 +339,5 @@ Content-Type: application/json
 所有 JSON 错误沿用 `{error: {code, message, fieldErrors, requestId}}`。未登录 401、角色／同源校验失败 403、未知记录／摄像头 404、参数错误 422、素材缺失 503 `REPLAY_NOT_READY`，数据库不可用 500。视频 Range 不合法返回 416 `INVALID_RANGE`，有效范围返回 206 和 Content-Range；不带 Range 返回 200。媒体和数据均不公共缓存。
 
 回放标注首次读取（version=0）包含四段人工预设；这些预设尚未保存，也不是数据集原始标注。保存后以数据库内容为准，主动保存的空集合不会自动恢复预设。ENGINEER 与 REVIEWER 共用编辑权限，同源校验和并发版本保护保持有效。
+
+线上视频与时序来自 Private Blob，接口路径及登录要求不变，不返回存储凭证。视频 Range 在服务端校验后转发；上游未返回匹配的 206、长度或范围时返回 500 `INTERNAL_ERROR`，不伪造成功片段。素材缺失／元数据读取失败返回 503 `REPLAY_NOT_READY`。准备步骤见 [007 运行说明](../specs/007-embodied-replay/quickstart.md#vercel-private-blob-上线)。

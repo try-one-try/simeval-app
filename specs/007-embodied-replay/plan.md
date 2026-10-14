@@ -1,5 +1,9 @@
 # 实施计划
 
+## 线上素材接入（2026-10-14）
+
+采用已创建的 Vercel Private Blob：固定路径 `embodied-replay/v1/agibot-2026-episode-0/`，脚本上传三路视频和两份 JSON，并逐文件校验。服务端保留登录验证，视频流转发 Range；本地默认读取磁盘，Vercel 默认读取 Blob，可用 `REPLAY_STORAGE` 显式选择。密钥仅服务端使用，素材不进入 Git。上传脚本拒绝覆盖内容不同的同名文件，换素材应升级目录版本。生产库仅执行已审阅的增量迁移，不 Seed 或重置。
+
 1. `scripts/import-replay.py` 校验 Parquet 时间和维度，生成三路兼容视频、manifest 和精简时序数据；不覆盖源文件。
 2. `src/domain/replay.ts` 管标注和时间规则，`src/lib/replay-dto.ts` 定义前后端数据契约。
 3. `src/server/providers/replay-source.ts` 读取固定目录白名单文件；`src/server/repositories/replay-repository.ts` 管标注版本、事务与审计；应用服务组合二者。

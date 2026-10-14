@@ -12,7 +12,17 @@ npm run db:deploy
 npm run dev
 ```
 
-迁移命令应在已核对的开发库运行。导入从 `meta/`、`data/`、`videos/` 生成 `assets/embodied-replay/agibot-2026-episode-0/`，包括三路 H.264 MP4、manifest 与时序 JSON。源文件不变。素材被 Git 忽略；公开部署前核对来源许可，在构建环境准备相同目录，Next.js 跟踪规则将素材带入回放接口函数。该方案适合单 Episode，更多数据需考虑对象存储及带宽。
+迁移命令应在已核对的开发库运行。导入从 `meta/`、`data/`、`videos/` 生成 `assets/embodied-replay/agibot-2026-episode-0/`，包括三路 H.264 MP4、manifest 与时序 JSON。源文件不变，展示素材被 Git 忽略。
+
+## Vercel Private Blob 上线
+
+1. 创建 Private Blob 并关联当前 Vercel 项目的 Production 环境，添加 `BLOB_READ_WRITE_TOKEN`。本机 `.env.local` 也配置该变量，不提交密钥。
+2. 在已导入素材的本地仓库运行 `npm run replay:upload`。上传固定目录 `embodied-replay/v1/agibot-2026-episode-0/` 下五个文件，SHA-256 校验；同名内容不同会停止，不能静默覆盖。仅核验用 `npm run replay:upload -- --verify`。
+3. 默认本地从磁盘读取，Vercel 从 Blob 读取；用 `REPLAY_STORAGE=blob` 可在本地验证云端。素材版本调整必须同步修改 Provider 与上传脚本的版本目录。
+4. 对核对过的生产数据库执行 `prisma migrate deploy --config prisma7.config.ts`；仅追加迁移，不运行 Seed 或重置。随后重新部署应用，并验证登录、数据、三路视频拖动和标注读取。
+5. Private Blob 不提供公开下载入口：服务端校验登录后读取，媒体转发 Range 并核对上游 206／长度／范围；浏览器不会收到 Blob 密钥。缺素材或配置错误仍报错，不回退伪造数据。
+
+来源：[AgiBot World 2026](https://huggingface.co/datasets/agibot-world/AgiBotWorld2026)，数据集标示 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/)。展示副本做视频转码、数值字段提取与指令翻译；衍生数据沿用该许可，原始作者保留署名。当前用途为非商业学习与面试展示，新增人工分段单独注明。本说明不改变应用代码许可。
 
 访问 `/optimization`，使用现有演示登录。媒体接口也需要会话，不能直接访问磁盘路径。
 

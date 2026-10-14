@@ -1,11 +1,11 @@
-import { createReadStream } from "node:fs";
-import { Readable } from "node:stream";
+import { replayAssetStream } from "@/server/providers/replay-storage";
 import { randomUUID } from "node:crypto";
 import { apiActor } from "@/server/http/api";
 import { AppError, assertRole } from "@/domain/evaluation";
 import { byteRange } from "@/domain/replay";
 import { replayVideo } from "@/server/providers/replay-source";
 export const runtime = "nodejs";
+export const maxDuration = 120;
 // 视频使用 HTTP Range；鉴权后才打开文件，拖动不必重新下载整段。
 export async function GET(request: Request, context: { params: Promise<{ episodeId: string; camera: string }> }) {
   let size: number | undefined;
@@ -15,9 +15,8 @@ export async function GET(request: Request, context: { params: Promise<{ episode
     const video = await replayVideo(episodeId, camera); size = video.size;
     const range = byteRange(request.headers.get("range"), size);
     const start = range?.start ?? 0, end = range?.end ?? size - 1;
-    const stream = createReadStream(video.file, { start, end });
-    // Node 的 toWeb 返回通用 ReadableStream，文件流的块实际为 Uint8Array。
-    return new Response(Readable.toWeb(stream) as ReadableStream<Uint8Array>, {
+    const stream = await replayAssetStream(video, range, request.signal);
+    return new Response(stream, {
       status: range ? 206 : 200, headers: { "Content-Type": "video/mp4", "Accept-Ranges": "bytes", "Content-Length": String(end-start+1),
         "Cache-Control": "private, no-store", ...(range ? { "Content-Range": `bytes ${start}-${end}/${size}` } : {}) },
     });

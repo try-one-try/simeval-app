@@ -84,7 +84,7 @@ function ReplayViewer({ data }: { data: ReplayData }) {
       </div></div>
       <p className={styles.hint}>拖动或步进后暂停，便于核对数值。三路视频以头部画面为主时钟；缓冲时共同暂停。</p>
     </section>
-    <footer className={styles.footer}>真实数据展示副本 · 人工时间分段预设可编辑 · 单位按来源说明 · 浏览回放不作科研级逐帧同步保证</footer>
+    <footer className={styles.footer}>来源：<a href="https://huggingface.co/datasets/agibot-world/AgiBotWorld2026" target="_blank" rel="noreferrer">AgiBot World 2026</a> · <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noreferrer">CC BY-NC-SA 4.0</a> · 视频转码／数值提取 · 人工分段 · 非科研级逐帧同步</footer>
     <dialog ref={jointDialog} className={`${styles.dialog} ${styles.jointDialog}`} aria-labelledby="joint-title">
       <header><div><h2 id="joint-title">14项关节位置</h2><p>数据帧 {frameIndex} · {replayTime(current.timestamp)} · 打开时暂停播放</p></div><button className={styles.smallButton} onClick={() => jointDialog.current?.close()}>关闭 ×</button></header>
       <div className={styles.statePanel}><div className={styles.tableScroll}><table><thead><tr><th>字段 / 原始单位</th><th>实际状态</th><th>控制动作</th></tr></thead><tbody>{manifest.fields.slice(2).map((field, offset) => { const index = offset + 2; return <tr key={field.key}><th>{field.label}<small>{field.unit ?? "单位未注明"}</small></th><td><strong>{value(current.state[index])}</strong><small>{field.stateField}</small></td><td><strong>{value(current.action[index])}</strong><small>{field.actionField}</small></td></tr>; })}</tbody></table></div></div>
