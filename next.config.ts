@@ -2,6 +2,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  outputFileTracingIncludes: { "/api/replay/episodes/**/*": ["./assets/embodied-replay/**/*"] },
   async headers() {
     return [{ source: "/avatar/v1/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }] }];
   },

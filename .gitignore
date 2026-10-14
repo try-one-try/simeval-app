@@ -6,6 +6,7 @@ src/generated/prisma/
 .next/
 out/
 coverage/
+assets/embodied-replay/
 .turbo/
 *.tsbuildinfo
 

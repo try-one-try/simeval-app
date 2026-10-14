@@ -83,6 +83,17 @@ model User {
   confirmedReports  AIReport[]      @relation("ReportConfirmer")
   audits            AuditLog[]      @relation("AuditActor")
   assistantSessions AssistantSession[]
+  replayAnnotations ReplayAnnotationSet[]
+}
+
+// 一条真实执行记录对应一组人工阶段；原始数据保持只读，审计保存前后快照。
+model ReplayAnnotationSet {
+  episodeId String @id @db.VarChar(64)
+  version Int @default(1)
+  annotations Json
+  updatedById String @db.VarChar(64)
+  updatedAt DateTime @updatedAt
+  updatedBy User @relation(fields: [updatedById], references: [id])
 }
 
 // 只保存请求来源的摘要和失败次数，不保存原始 IP 或访问密码。

@@ -22,6 +22,7 @@ export async function resetDemoData(db: PrismaClient, onStage?: (stage: DemoRese
     await tx.assistantTurn.deleteMany();
     await tx.assistantSession.deleteMany();
     await tx.accessAttempt.deleteMany();
+    await tx.replayAnnotationSet.deleteMany();
     await tx.auditLog.deleteMany();
     await tx.aIReport.deleteMany();
     await tx.backfillTask.deleteMany();

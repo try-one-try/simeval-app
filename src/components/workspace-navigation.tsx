@@ -10,7 +10,7 @@ import { isCurrentItem, workspaceItems } from "@/lib/workspace-navigation";
 function NavigationItems({ role }: { role: DemoRole }) {
   const pathname = usePathname();
   return <nav aria-label="工作台导航" className="nav-list">{workspaceItems(role).map((item) =>
-    <Link key={item.href} href={item.href} className="nav-item" aria-current={isCurrentItem(pathname, item.href) ? "page" : undefined}>
+    <Link key={item.href} href={item.href} prefetch={item.href === "/optimization" ? false : undefined} className="nav-item" aria-current={isCurrentItem(pathname, item.href) ? "page" : undefined}>
       <span className="nav-name">{item.label}<span className="nav-arrow" aria-hidden="true">↗</span></span>
       <span className="nav-description">{item.description}</span>
     </Link>
@@ -25,7 +25,7 @@ export function WorkspaceNavigation({ role }: { role: DemoRole }) {
     onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setExpanded(false); }}>
     <Link href="/" className="brand">simeval.</Link>
     <div className="sidebar-label"><span>工作区</span><button className="expand-control" type="button" aria-label={expanded ? "收起导航说明" : "展开导航说明"} aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>{expanded ? "‹" : "›"}</button></div>
-    <NavigationItems role={role} /><p className="sidebar-note">合成演示数据 · 模拟执行</p>
+    <NavigationItems role={role} /><p className="sidebar-note">评测：合成数据 · 模拟执行<br />优化设计：真实数据回放</p>
   </aside>;
 }
 export function MobileNavigation({ role }: { role?: DemoRole }) {
@@ -41,7 +41,7 @@ export function MobileNavigation({ role }: { role?: DemoRole }) {
       <div onClick={(event) => { if ((event.target as HTMLElement).closest("a")) close(); }}>
         {role ? <NavigationItems role={role} /> : <nav className="nav-list" aria-label="首页导航"><Link className="nav-item" href="/#workflow">产品概览</Link><Link className="nav-item" href="/login">选择演示身份 →</Link></nav>}
       </div>
-      <p className="muted">合成演示数据 · 后续模块明确标注未开放。</p>
+      <p className="muted">评测使用合成数据；优化设计提供真实数据回放。</p>
     </dialog>
   </>;
 }

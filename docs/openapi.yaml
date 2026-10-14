@@ -1,10 +1,12 @@
 openapi: 3.1.0
 info:
   title: SimEval HTTP API
-  version: 0.11.0
-  description: 合成数据与模拟执行；24 项业务操作已实现，指派和重开 2 项为 planned。Agent 用于只读聊天调查，每任务维护一份由模板生成的系统报告。
+  version: 0.12.1
+  description: 评测主线使用合成数据与模拟执行；指派和重开为 planned。Agent 用于只读聊天调查，每任务维护一份模板报告。Replay 独立展示真实执行记录，并保存人工阶段标注。
 jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
 tags:
+- name: Replay
+  description: 真实执行记录同步回放与人工阶段标注
 - name: Catalog
   description: 评测配置目录与兼容性
 - name: DataQuality
@@ -22,6 +24,105 @@ tags:
 security:
 - sessionCookie: []
 paths:
+  /api/replay/episodes/{episodeId}:
+    get:
+      tags: [Replay]
+      summary: 读取真实执行记录的元数据和精简时序
+      description: 仅允许 agibot-2026-episode-0；角色 ENGINEER、REVIEWER。无素材返回 503 REPLAY_NOT_READY；未登录 401，角色不允许 403，未知记录 404。
+      operationId: getReplayEpisode
+      parameters:
+      - $ref: '#/components/parameters/ReplayEpisodeId'
+      responses:
+        '200':
+          description: data 包含 manifest 和 frames；所有数值保留原单位，null 表示来源未注明单位。
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReplayDataEnvelope'
+        '401': {description: 未登录}
+        '403': {description: 无权限}
+        '404': {description: 记录不存在}
+        '503': {description: 素材未准备好}
+  /api/replay/episodes/{episodeId}/annotations:
+    get:
+      tags: [Replay]
+      summary: 读取人工阶段标注；未保存时 version 为 0，并返回可修改的人工分段预设
+      operationId: getReplayAnnotations
+      parameters:
+      - $ref: '#/components/parameters/ReplayEpisodeId'
+      responses:
+        '200':
+          description: ENGINEER、REVIEWER 可读；原始指令由 manifest 单独提供。
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReplayAnnotationsEnvelope'}
+        '401': {description: 未登录}
+        '403': {description: 无权限}
+        '404': {description: 记录不存在}
+        '503': {description: 素材未准备好}
+    put:
+      tags: [Replay]
+      summary: 两种身份共同保存人工标注，版本条件更新与审计同事务提交
+      operationId: saveReplayAnnotations
+      description: ENGINEER、REVIEWER；必须同源、application/json。冲突返回 409 VERSION_CONFLICT，参数错误返回 422；不修改原始数据。首次 expectedVersion=0。
+      parameters:
+      - $ref: '#/components/parameters/ReplayEpisodeId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expectedVersion, annotations]
+              properties:
+                expectedVersion: {type: integer, minimum: 0}
+                annotations:
+                  type: array
+                  maxItems: 100
+                  items: {$ref: '#/components/schemas/ReplayAnnotation'}
+      responses:
+        '200':
+          description: 返回新版本和修改人、时间；移除段同样留审计。
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/ReplayAnnotationsEnvelope'}
+        '401': {description: 未登录}
+        '403': {description: 未获准角色或非同源写入}
+        '404': {description: 记录不存在}
+        '409': {description: VERSION_CONFLICT，草稿应保留}
+        '422': {description: VALIDATION_ERROR，编号重复、范围错误或输入不合规}
+        '503': {description: 素材未准备好}
+  /api/replay/episodes/{episodeId}/media/{camera}:
+    get:
+      tags: [Replay]
+      summary: 登录后读取固定三路 H.264 MP4；支持单段 HTTP Range
+      operationId: getReplayVideo
+      parameters:
+      - $ref: '#/components/parameters/ReplayEpisodeId'
+      - name: camera
+        in: path
+        required: true
+        schema: {type: string, enum: [head, left, right]}
+      - name: Range
+        in: header
+        schema: {type: string, example: 'bytes=0-1048575'}
+      responses:
+        '200':
+          description: 完整视频；Cache-Control 为 private, no-store
+          content:
+            video/mp4:
+              schema: {type: string, format: binary}
+        '206':
+          description: 指定字节范围，含 Content-Range、Content-Length 和 Accept-Ranges
+          content:
+            video/mp4:
+              schema: {type: string, format: binary}
+        '401': {description: 未登录}
+        '403': {description: 无权限}
+        '404': {description: 非固定记录或摄像头}
+        '416': {description: INVALID_RANGE，Content-Range 指明完整文件长度}
+        '503': {description: 视频文件未准备好}
   /api/datasets/{datasetId}/quality:
     get:
       tags:
@@ -1146,6 +1247,11 @@ components:
       name: authjs.session-token
       description: Auth.js Session Cookie；生产环境可能有 Secure 前缀，开发为 authjs.session-token，HTTPS 由 Auth.js 使用 Secure 前缀。
   parameters:
+    ReplayEpisodeId:
+      name: episodeId
+      in: path
+      required: true
+      schema: {type: string, enum: [agibot-2026-episode-0]}
     DatasetId:
       name: datasetId
       in: path
@@ -1238,6 +1344,88 @@ components:
           schema:
             $ref: '#/components/schemas/ErrorEnvelope'
   schemas:
+    ReplayAnnotation:
+      type: object
+      additionalProperties: false
+      required: [id, label, note, startFrame, endFrame]
+      properties:
+        id: {type: string, format: uuid}
+        label: {type: string, minLength: 1, maxLength: 80}
+        note: {type: string, maxLength: 1000}
+        startFrame: {type: integer, minimum: 0, description: 包含此帧}
+        endFrame: {type: integer, minimum: 1, description: 不包含此帧；必须大于开始帧且不超过 frameCount}
+    ReplayAnnotationsEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        meta: {type: object, properties: {requestId: {type: string}}}
+        data:
+          type: object
+          required: [version, annotations, updatedAt, updatedBy]
+          properties:
+            version: {type: integer, minimum: 0}
+            annotations: {type: array, items: {$ref: '#/components/schemas/ReplayAnnotation'}}
+            updatedAt: {type: [string, 'null'], format: date-time}
+            updatedBy: {type: [string, 'null']}
+    ReplayDataEnvelope:
+      type: object
+      required: [data, meta]
+      properties:
+        meta: {type: object, properties: {requestId: {type: string}}}
+        data:
+          type: object
+          required: [manifest, frames]
+          properties:
+            manifest:
+              type: object
+              required: [id, dataset, format, robot, episodeIndex, task, instruction, instructionZh, frameCount, fps, duration, lastTimestamp, cameras, fields, originalSegments]
+              properties:
+                id: {type: string}
+                dataset: {type: string}
+                format: {type: string}
+                robot: {type: string}
+                episodeIndex: {type: integer}
+                task: {type: string}
+                instruction: {type: string}
+                instructionZh: {type: string}
+                frameCount: {type: integer}
+                fps: {type: number}
+                duration: {type: number}
+                lastTimestamp: {type: number}
+                cameras:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      key: {type: string, enum: [head, left, right]}
+                      label: {type: string}
+                      sourceChannel: {type: string}
+                fields:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      key: {type: string}
+                      label: {type: string}
+                      stateField: {type: string}
+                      actionField: {type: string}
+                      unit: {type: [string, 'null']}
+                originalSegments:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      label: {type: string}
+                      startFrame: {type: integer}
+                      endFrame: {type: integer}
+            frames:
+              type: array
+              items:
+                type: object
+                properties:
+                  timestamp: {type: number}
+                  state: {type: array, items: {type: number}}
+                  action: {type: array, items: {type: number}}
     ResourceId:
       type: string
       minLength: 1

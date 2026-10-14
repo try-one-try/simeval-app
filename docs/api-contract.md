@@ -309,3 +309,33 @@ Content-Type: application/json
 | 2026-10-04 | 0.10.0 | 任务列表返回 RunSummary；比较 baselines 返回 id/name/modelVersion 摘要。任务详情与实际选中基线仍返回完整 Run；分页、权限及错误结构不变 |
 | 2026-10-05 | 0.10.0 错误扩展 | 同项目未删除任务名 trim 后不区分大小写，创建重名返回 RUN_NAME_CONFLICT 与 fieldErrors.name；重试自动编号、幂等重放返回原任务。成功字段不变，无新增迁移；本轮按负责人约定未运行检查或浏览器验收 |
 | 2026-10-07 | 0.11.0 | 新增名称预检查／建议接口；检查质量前反馈重名，演示配置实时选择未占用名称。接口只读，创建仍事务查重；同步相关测试用例，按负责人约定未运行 |
+
+## 新增：具身数据同步回放
+
+固定执行记录 `agibot-2026-episode-0`，页面 `/optimization`。本功能真实数据与合成评测任务独立。
+
+| 请求 | 作用 | 权限 |
+|---|---|---|
+| GET `/api/replay/episodes/{episodeId}` | 返回 manifest、时间戳和选定状态／动作数组 | 两种角色 |
+| GET `/api/replay/episodes/{episodeId}/annotations` | 返回人工标注、版本、修改人与时间 | 两种角色 |
+| PUT `/api/replay/episodes/{episodeId}/annotations` | 整组保存人工标注并留审计 | 两种角色 |
+| GET `/api/replay/episodes/{episodeId}/media/{camera}` | head / left / right 视频，支持单段 Range | 两种角色 |
+
+保存示例（同源请求、application/json）：
+
+```json
+{
+  "expectedVersion": 0,
+  "annotations": [{
+    "id": "13b7121c-a4c7-4ffc-9c9f-9d769d194864",
+    "label": "人工观察片段", "note": "根据实际画面填写",
+    "startFrame": 0, "endFrame": 90
+  }]
+}
+```
+
+成功响应：`{data: {version: 1, annotations: [...], updatedAt: ISO时间, updatedBy: 修改人}, meta: {requestId}}`。帧区间左闭右开，开始小于结束且结束不超过 frameCount；最多 100 段，可重叠。原始指令不被覆盖，人工标注全组替换。409 `VERSION_CONFLICT` 时保留草稿，读取最新记录核对再提交。
+
+所有 JSON 错误沿用 `{error: {code, message, fieldErrors, requestId}}`。未登录 401、角色／同源校验失败 403、未知记录／摄像头 404、参数错误 422、素材缺失 503 `REPLAY_NOT_READY`，数据库不可用 500。视频 Range 不合法返回 416 `INVALID_RANGE`，有效范围返回 206 和 Content-Range；不带 Range 返回 200。媒体和数据均不公共缓存。
+
+回放标注首次读取（version=0）包含四段人工预设；这些预设尚未保存，也不是数据集原始标注。保存后以数据库内容为准，主动保存的空集合不会自动恢复预设。ENGINEER 与 REVIEWER 共用编辑权限，同源校验和并发版本保护保持有效。

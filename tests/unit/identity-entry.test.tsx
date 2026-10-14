@@ -10,8 +10,8 @@ vi.mock("server-only",()=>({}));
 import { ModuleEntry } from "@/features/evaluation/module-entry";
 beforeEach(() => { vi.clearAllMocks(); mocks.viewer.mockResolvedValue({ id: "reviewer", role: "REVIEWER" }); });
 it("两身份导航按职责呈现，不再提供独立总览", () => {
-  expect(workspaceItems("ENGINEER").map((item) => item.label)).toEqual(["创建评测", "评测任务", "模型对比", "异常复核", "报告"]);
-  expect(workspaceItems("REVIEWER").map((item) => item.label)).toEqual(["评测任务", "异常复核", "报告"]);
+  expect(workspaceItems("ENGINEER").map((item) => item.label)).toEqual(["创建评测", "评测任务", "模型对比", "异常复核", "报告", "优化设计"]);
+  expect(workspaceItems("REVIEWER").map((item) => item.label)).toEqual(["评测任务", "异常复核", "报告", "优化设计"]);
 });
 it("创建页不同时高亮评测任务，详情不高亮创建", () => {
   for (const path of ["/evaluations/new", "/evaluations/run-1", "/anomalies"]) {
