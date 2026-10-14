@@ -5,6 +5,7 @@ import { homeContent } from "./content";
 import { AVATAR_BASE, createAvatarEngine, type LoadProgress } from "./avatar/engine";
 import { pointerTarget, touchTarget, type Direction } from "./avatar/controls";
 import styles from "./home.module.css";
+import { useMagneticPanels } from "./use-magnetic-panels";
 
 type Status = "loading" | "ready" | "error" | "static";
 type Props = { header: ReactNode; introduction: ReactNode; left: ReactNode; right: ReactNode; footer: ReactNode };
@@ -13,6 +14,8 @@ type Props = { header: ReactNode; introduction: ReactNode; left: ReactNode; righ
  * 修改两侧文字不会重建动画；离开首页释放所有网络、事件与位图资源。
  */
 export function InteractiveHome({ header, introduction, left, right, footer }: Props) {
+  const conversation = useRef<HTMLDivElement>(null);
+  useMagneticPanels(conversation);
   const frame = useRef<HTMLDivElement>(null);
   const canvas = useRef<HTMLCanvasElement>(null);
   const poster = useRef<HTMLImageElement>(null);
@@ -126,7 +129,7 @@ export function InteractiveHome({ header, introduction, left, right, footer }: P
       {header}
       <main id="home-main" className={styles.main}>
         {introduction}
-        <div className={styles.conversation}>
+        <div className={styles.conversation} ref={conversation}>
           {left}
           <section className={styles.portrait} aria-label="互动人物">
             <div className={styles.frame} ref={frame} tabIndex={0} role="group" aria-label="人物互动：鼠标移动或在人物区域单指拖动，向左扶镜、向右伸手、向上抬头、向下低头；松手回待机。聚焦后可用方向键，Escape 回到待机。"

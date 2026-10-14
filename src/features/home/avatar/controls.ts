@@ -116,12 +116,12 @@ export function touchTarget(dx: number, dy: number, width: number, previous: Dir
 
 /** 下面才是人物运动速度。上面的参数只管“鼠标走多远，动作做多少”。
  * 人物会沿着视频慢慢做到指定动作；换方向时，先自然收手，再做新动作。
- * 为了保留已调好的流畅效果，日常调手感不用改这里。
+ * 播放倍率同时影响动作展开与回程，不改变指针触发范围。
  */
 export function advanceFrame(position: number, target: number, seconds: number, frames: number) {
   // 快到指定动作时逐渐放慢，避免手突然停住。0.4 是最低速度，1 是最高速度，6 控制何时减速。
-  const speed = clamp(Math.abs(target - position) * 6, .4, 1);
-  // 每次最多走一张图片；电脑暂时卡顿时，也不突然跳过一大段动作。
-  const distance = Math.min(Math.max(0, seconds) * speed, 1 / (frames - 1));
+  const speed = clamp(Math.abs(target - position) * 6, .4, 1) * 1.2;
+  // 允许最多推进两帧，让加速在普通 60Hz 屏幕上生效，同时限制卡顿后的跳跃。
+  const distance = Math.min(Math.max(0, seconds) * speed, 2 / (frames - 1));
   return Math.abs(target - position) <= distance ? target : position + Math.sign(target - position) * distance;
 }

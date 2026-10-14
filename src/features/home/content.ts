@@ -17,7 +17,7 @@ export const homeContent = {
     { label: "开发流程", href: development, external: true },
     { label: "开始体验", href: "/login", external: false },
   ],
-  introduction: { label: "DESIGN → BUILD → REFINE", note: "一个从产品思考走向工程实践的项目。" },
+  introduction: { label: "DESIGN → BUILD → REFINE", note: "一个从产品设计到工程实践的MVP项目。" },
   behind: {
     // 左侧资料卡。可改标题和说明、调整 items 顺序，新增资料项也有默认图标。
     label: "BEHIND THE BUILD",
@@ -42,7 +42,7 @@ export const homeContent = {
     // 右侧先用短句介绍项目，再列出真实可体验的流程；不要把未实现的报告写进来。
     label: "EXPLORE SIMEVAL",
     title: "项目简介",
-    description: "SimEval 是面向具身智能模型的评测数据工作台。先确认数据质量，再创建模拟评测；拿到结果后，可以对比模型版本、定位异常样本，并由评测人员复核结论。演示使用合成数据，不运行真实仿真器。",
+    description: "SimEval 是面向具身智能模型的评测工作台MVP项目。先确认数据质量，再创建模拟评测；拿到结果后，可以对比模型版本、定位异常样本，并由评测人员复核结论。演示使用合成数据，不运行真实仿真器。",
     workflowLabel: "一次评测，如何形成判断",
     steps: [
       { title: "配置与质量确认", detail: "选择模型与数据，确认评测条件。" },
