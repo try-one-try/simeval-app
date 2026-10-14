@@ -73,7 +73,7 @@ function ReplayViewer({ data }: { data: ReplayData }) {
     <section className={styles.timeline} aria-label="统一时间轴">
       <header className={styles.sectionHeader}><h2>统一时间轴</h2><span role="status">{player.status}</span></header>
       <div className={styles.timelineBody}><div className={styles.transport}>
-        <div><button className={styles.play} disabled={!player.ready || !!player.error} onClick={player.playing ? player.pause : player.play}>{player.playing ? "暂停" : "播放"}</button>
+        <div><button className={styles.play} disabled={!player.loaded || !!player.error} onClick={player.playRequested ? player.pause : player.play}>{player.playRequested ? (player.playing ? "暂停" : "取消等待") : "播放"}</button>
           <button className={styles.smallButton} disabled={!player.ready || frameIndex === 0} onClick={() => player.seek(frames[Math.max(0, frameIndex-1)].timestamp)}>上一帧</button><button className={styles.smallButton} disabled={!player.ready || frameIndex === frames.length-1} onClick={() => player.seek(frames[Math.min(frames.length-1, frameIndex+1)].timestamp)}>下一帧</button>
           <label className={styles.speed}>倍速<select aria-label="播放速度" value={player.rate} onChange={e => player.changeRate(Number(e.target.value))}>{[.5,1,1.5,2].map(v => <option key={v} value={v}>{v}×</option>)}</select></label></div>
         <strong>{replayTime(player.time)} <span>/ {replayTime(manifest.duration)}</span></strong>

@@ -21,6 +21,31 @@
 - 集成测试使用 `.env.test.local` 中独立的 `TEST_DATABASE_URL`，库名必须 `simeval_test`。本机可用 `scripts/setup-local-db.ps1 -Database test` 准备。然后运行 `npm run test:integration`；未配置时明确失败。
 - `npm run test:unit` 不需要数据库。网页仍由负责人手工检查，无自动浏览器测试框架。
 
+### 开发、数据库与检查命令
+
+| 命令 | 什么时候用 |
+|---|---|
+| `npm ci` | 首次或锁文件变化时安装依赖，同时生成 Prisma Client。 |
+| `npm run dev` | 启动本地开发服务；停止时按 `Ctrl+C`。 |
+| `npm run db:deploy` | 把仓库已有迁移应用到目标数据库；新库初始化或拉到新迁移时使用。 |
+| `npm run db:migrate` | 修改 Prisma Schema 后创建并应用新迁移；只用于开发库，需要 shadow database 权限。 |
+| `npm run db:generate` | 根据 Schema 重新生成 Prisma Client；随后重启应用服务。 |
+| `npm run db:seed` | 首次写入演示数据；重复执行会补写或更新固定内容，不会完整清空新增任务。 |
+| `npm run db:catalog` | 增量补齐目录及演示记录，保留已有结果、人工结论和删除状态。 |
+| `.\scripts\reset-dev-demo.ps1 --check` | 检查恢复开发库将使用的配置；不连接、不修改数据库。 |
+| `.\scripts\reset-dev-demo.ps1` | 清理开发演示库的业务记录，再恢复默认数据。 |
+| `.\scripts\reset-production-demo.ps1 --check` | 检查恢复线上库将使用的配置；不连接、不修改数据库。 |
+| `.\scripts\reset-production-demo.ps1` | 清理线上演示库的业务记录，再恢复默认数据；还需输入确认词。 |
+| `npm run lint` | 检查代码规范和常见问题。 |
+| `npm run typecheck` | 检查 TypeScript 类型。 |
+| `npm run test:unit` | 运行保留的单元测试，不需要数据库；不包含人物序列帧交互测试。 |
+| `npm run test:integration` | 在独立的 `simeval_test` 数据库验证读写、事务等行为；没有测试库配置时会失败。 |
+| `npm run build` | 生成生产环境使用的构建产物。 |
+| `npm run start` | 在本机运行已经构建的版本，需先执行 `npm run build`；可信本机预览按需配置 `AUTH_TRUST_HOST=true`。 |
+
+
+
+
 ## 3. 演示数据的维护边界
 
 首次初始化、增量补目录和完整恢复是三种不同操作。普通构建、发布和登录不会自动清空数据。

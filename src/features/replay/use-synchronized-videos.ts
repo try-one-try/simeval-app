@@ -9,10 +9,13 @@ export function useSynchronizedVideos(duration: number) {
   const [status, setStatus] = useState("正在加载三路视频"), [error, setError] = useState("");
   const [rate, setRate] = useState(1), [ready, setReady] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  // 用户的播放意图与视频是否正在推进分开；缓冲期间也能取消等待。
+  const [playRequested, setPlayRequested] = useState(false);
   const [readyCount, setReadyCount] = useState(0), [initialized, setInitialized] = useState(false);
   useEffect(() => {
     const list = videos.current.filter((v): v is HTMLVideoElement => v !== null);
     let intent = false, disposed = false, starting = false, raf = 0, failed = false;
+    const requestPlay = (value: boolean) => { intent = value; setPlayRequested(value); };
     const allReady = () => list.length === 3 && list.every(v => v.readyState >= 3 && !v.seeking && !v.error);
     const stopFrames = () => { cancelAnimationFrame(raf); raf = 0; };
     const pauseAll = () => { list.forEach(v => v.pause()); stopFrames(); setPlaying(false); };
@@ -39,23 +42,23 @@ export function useSynchronizedVideos(duration: number) {
         if (disposed || !intent || !allReady()) { pauseAll(); return; }
         setPlaying(true); setStatus("三路同步回放中"); stopFrames(); raf = requestAnimationFrame(tick);
       } catch {
-        if (!disposed && intent) { intent = false; pauseAll(); setError("播放未能启动，请点击播放重试；若仍失败，请重新加载视频。"); }
+        if (!disposed && intent) { requestPlay(false); pauseAll(); setError("播放未能启动，请点击播放重试；若仍失败，请重新加载视频。"); }
       } finally { starting = false; }
     };
     const waiting = () => { pauseAll(); setReady(false); setStatus("正在同步／缓冲三路画面…"); };
     const onReady = () => { void resume(); };
-    const onError = () => { failed = true; intent = false; pauseAll(); setReady(false); setError("有一路视频加载失败，已停止同步播放。请检查网络或登录状态后重试。"); };
-    const ended = () => { intent = false; pauseAll(); setTime(Math.min(list[0].currentTime, duration)); setStatus("回放结束"); };
+    const onError = () => { failed = true; requestPlay(false); pauseAll(); setReady(false); setError("有一路视频加载失败，已停止同步播放。请检查网络或登录状态后重试。"); };
+    const ended = () => { requestPlay(false); pauseAll(); setTime(Math.min(list[0].currentTime, duration)); setStatus("回放结束"); };
     controller.current = {
-      play: () => { if (failed) return; setError(""); intent = true; if (list[0]?.ended) list.forEach(v => { v.currentTime = 0; }); void resume(); },
-      pause: () => { intent = false; pauseAll(); setStatus("已暂停"); },
+      play: () => { if (failed) return; setError(""); requestPlay(true); if (list[0]?.ended) list.forEach(v => { v.currentTime = 0; }); void resume(); },
+      pause: () => { requestPlay(false); pauseAll(); setStatus("已暂停"); },
       seek: value => {
-        intent = false; pauseAll();
+        requestPlay(false); pauseAll();
         const next = Math.max(0, Math.min(duration - 1 / 30, value));
         setTime(next); setStatus("正在定位对应画面…");
         list.forEach(v => { if (v.readyState >= 1) v.currentTime = next; });
       },
-      retry: () => { intent = false; failed = false; pauseAll(); setError(""); setTime(0); setReady(false); setStatus("正在重新加载三路视频…"); list.forEach(v => v.load()); },
+      retry: () => { requestPlay(false); failed = false; pauseAll(); setError(""); setTime(0); setReady(false); setStatus("正在重新加载三路视频…"); list.forEach(v => v.load()); },
     };
     for (const video of list) {
       video.addEventListener("waiting", waiting); video.addEventListener("seeking", waiting);
@@ -75,7 +78,7 @@ export function useSynchronizedVideos(duration: number) {
     };
   }, [duration]);
   function changeRate(value: number) { setRate(value); videos.current.forEach(v => { if (v) { v.defaultPlaybackRate = value; v.playbackRate = value; } }); }
-  return { videos, time, playing, ready, loaded, readyCount, initialized, status, error, rate, changeRate,
+  return { videos, time, playing, playRequested, ready, loaded, readyCount, initialized, status, error, rate, changeRate,
     play: () => controller.current.play(), pause: () => controller.current.pause(),
     seek: (value: number) => controller.current.seek(value), retry: () => controller.current.retry() };
 }
