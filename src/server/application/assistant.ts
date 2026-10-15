@@ -1,4 +1,4 @@
-// 编排一个完整轮次；HTTP 只负责传输，Agent 不直接掌握会话归属和费用账本。
+// 管理编排问答流程；HTTP 只负责传输，Agent 不直接掌握会话归属和费用账本。
 import "server-only";
 import { AppError } from "@/domain/evaluation";
 import type { AssistantActor, AssistantEvent, Evidence, ToolTrace } from "@/domain/assistant";
@@ -48,22 +48,30 @@ export const assistantService = {
     };
     try {
       emit({ type: "start", turnId: turn.id });
-      const result = await runInvestigation({ actor, sessionId: session.id, turnId: turn.id, runId: session.runId, baselineRunId: session.baselineRunId,
-        question: turn.question, sampleId, createdAt: turn.createdAt, signal, emit: emitTracked, accounting });
-      const saved = await assistantRepository.finish(turn.id, { status: "SUCCEEDED", answer: result.answer, messages: jsonValue(result.messages), evidence: jsonValue(result.evidence), traces: jsonValue(result.traces), modelCalls: accounting.calls,
-        inputTokens: accounting.known ? accounting.input : null, outputTokens: accounting.known ? accounting.output : null }, result.charge);
+      const result = await runInvestigation({
+        actor, sessionId: session.id, turnId: turn.id, runId: session.runId, baselineRunId: session.baselineRunId,
+        question: turn.question, sampleId, createdAt: turn.createdAt, signal, emit: emitTracked, accounting
+      });
+      const saved = await assistantRepository.finish(turn.id, {
+        status: "SUCCEEDED", answer: result.answer, messages: jsonValue(result.messages), evidence: jsonValue(result.evidence), traces: jsonValue(result.traces), modelCalls: accounting.calls,
+        inputTokens: accounting.known ? accounting.input : null, outputTokens: accounting.known ? accounting.output : null
+      }, result.charge);
       emit({ type: "done", turn: saved });
     } catch (error) {
       // 原始模型错误可能被框架包在 cause 中；只记安全分类，不把错误正文写进日志。
-      console.warn("assistant_run_failed", { turnId: turn.id, code: error instanceof AppError ? error.code : undefined,
-        ...getAssistantErrorDiagnostics(error) });
+      console.warn("assistant_run_failed", {
+        turnId: turn.id, code: error instanceof AppError ? error.code : undefined,
+        ...getAssistantErrorDiagnostics(error)
+      });
       const timedOut = Date.now() >= turn.deadlineAt.getTime();
       const failure = error instanceof AppError ? error : new AppError(timedOut ? "TIMEOUT" : signal.aborted ? "CANCELLED" : "MODEL_ERROR",
         timedOut ? "本轮分析超时，请缩小问题范围后重试" : signal.aborted ? "本轮已停止" : "模型服务暂时不可用，请检查网络、账户额度或稍后重试", 502);
       const charge = accounting.known && accounting.calls === accounting.completed ? usageMicros(accounting.input, accounting.output) : null;
-      const saved = await assistantRepository.finish(turn.id, { status: timedOut ? "TIMED_OUT" : signal.aborted ? "CANCELLED" : "FAILED", errorCode: failure.code, errorMessage: failure.message,
+      const saved = await assistantRepository.finish(turn.id, {
+        status: timedOut ? "TIMED_OUT" : signal.aborted ? "CANCELLED" : "FAILED", errorCode: failure.code, errorMessage: failure.message,
         traces: jsonValue(traces), evidence: jsonValue([] as Evidence[]), modelCalls: accounting.calls,
-        inputTokens: accounting.known && accounting.completed === accounting.calls ? accounting.input : null, outputTokens: accounting.known && accounting.completed === accounting.calls ? accounting.output : null }, charge);
+        inputTokens: accounting.known && accounting.completed === accounting.calls ? accounting.input : null, outputTokens: accounting.known && accounting.completed === accounting.calls ? accounting.output : null
+      }, charge);
       emit({ type: "done", turn: saved });
     } finally {
       clearTimeout(timeout); clearInterval(poll); connectionSignal.removeEventListener("abort", disconnect); controllers.delete(turn.id);
